@@ -1,5 +1,5 @@
-// Peças comuns das funções do site (Cloudflare Pages Functions).
-// Recebem `env` (as variáveis de ambiente do Cloudflare) em vez de process.env.
+// Peças comuns das funções do site (Vercel Functions, em api/).
+// Recebem `env` (process.env na Vercel; um objeto falso nos testes).
 //
 // Variáveis:
 //   SUPABASE_URL              https://<ref>.supabase.co

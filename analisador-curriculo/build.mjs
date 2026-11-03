@@ -1,10 +1,11 @@
-// Monta o site para a Cloudflare Pages: copia para dist/ SÓ os arquivos da
-// lista abaixo. Tudo o mais (Vigia, testes, scripts do Windows, dados) fica fora.
-// As funções em functions/ são publicadas pela própria Cloudflare.
+// Monta o site para a Vercel: copia para dist/ SÓ os arquivos da lista abaixo.
+// Tudo o mais (Vigia, testes, scripts do Windows, dados) fica fora do site.
+// As funções em api/ são publicadas pela própria Vercel. Os cabeçalhos de
+// segurança estão no vercel.json.
 //
 //   node build.mjs
 
-import { cp, mkdir, rm, writeFile, access } from 'node:fs/promises';
+import { cp, mkdir, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,14 +19,6 @@ const PUBLICOS = [
   'img/entrar.jpg', 'img/cadastro.jpg',
 ];
 
-// Cabeçalhos de segurança para todas as páginas.
-const HEADERS = `/*
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
-  X-Frame-Options: DENY
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Strict-Transport-Security: max-age=31536000; includeSubDomains
-`;
 
 await rm(DESTINO, { recursive: true, force: true });
 for (const arq of PUBLICOS) {
@@ -34,5 +27,4 @@ for (const arq of PUBLICOS) {
   await mkdir(path.dirname(path.join(DESTINO, arq)), { recursive: true });
   await cp(origem, path.join(DESTINO, arq));
 }
-await writeFile(path.join(DESTINO, '_headers'), HEADERS);
 console.log(`dist/ pronto: ${PUBLICOS.length} arquivos.`);

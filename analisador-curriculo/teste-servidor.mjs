@@ -243,3 +243,49 @@ test('webhook: falha no banco devolve 500 para o Asaas reenviar', async () => {
   const r = await webhookAsaas(evento({ id: 'evt_11', event: 'PAYMENT_RECEIVED', payment: {} }), ENV, f);
   assert.equal(r.status, 500);
 });
+
+// ------------------------------------------------------------------ busca de vagas e funções da Vercel
+import { buscarVagas, lerVaga } from './lib/servidor/vagas.mjs';
+import { GET as apiVagas } from './api/vagas.mjs';
+import { POST as apiWebhook } from './api/asaas-webhook.mjs';
+
+const paginaGupy = (pageProps) => `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps } })}</script></html>`;
+
+test('busca: sem acesso (402) nem chega a consultar a Gupy', async () => {
+  const f = fetchFalso([[/rpc\/tem_acesso$/, 'POST', { body: false }]]);
+  const r = await buscarVagas(comToken('https://x/api/vagas?termo=analista'), ENV, f);
+  assert.equal(r.status, 402);
+  assert.equal(f.de(/gupy\.io/).length, 0);
+});
+
+test('busca: com acesso, consulta a Gupy e devolve as vagas', async () => {
+  const f = fetchFalso([
+    [/rpc\/tem_acesso$/, 'POST', { body: true }],
+    [/portal\.gupy\.io\/job-search\/term=analista&state=Paran%C3%A1$/, 'GET', { body: undefined }],
+  ]);
+  // A rota da Gupy devolve HTML, não JSON: troca a resposta por uma página com __NEXT_DATA__.
+  const html = paginaGupy({ initialJobList: { pagination: { total: 1 }, data: [{ id: 7, name: 'Analista', jobUrl: 'https://empresa.gupy.io/job/x' }] } });
+  const fComHtml = async (url, opts) => (/gupy\.io/.test(url) ? new Response(html) : f(url, opts));
+  const r = await buscarVagas(comToken('https://x/api/vagas?termo=analista&estado=Paran%C3%A1'), ENV, fComHtml);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('cache-control'), 'private, max-age=600');
+  assert.equal((await r.json()).vagas[0].url, 'https://empresa.gupy.io/jobs/7');
+});
+
+test('vaga: link fora da Gupy é recusado antes de qualquer consulta', async () => {
+  const f = fetchFalso([[/rpc\/tem_acesso$/, 'POST', { body: true }]]);
+  const r = await lerVaga(comToken('https://x/api/vaga?url=' + encodeURIComponent('https://evil.com/jobs/1')), ENV, f);
+  assert.equal(r.status, 400);
+});
+
+test('funções da Vercel: usam process.env', async () => {
+  const antes = { ...process.env };
+  try {
+    delete process.env.SUPABASE_URL;
+    delete process.env.ASAAS_WEBHOOK_TOKEN;
+    assert.equal((await apiVagas(new Request('https://x/api/vagas'))).status, 400, 'sem termo');
+    assert.equal((await apiWebhook(new Request('https://x/api/asaas-webhook', { method: 'POST', body: '{}' }))).status, 500, 'sem token configurado não processa');
+  } finally {
+    process.env = antes;
+  }
+});

@@ -10,10 +10,10 @@
 
 | Peça | Serviço | Custo para começar |
 |---|---|---|
-| Site e funções | Cloudflare Pages | Grátis, uso comercial permitido |
+| Site e funções | Vercel (plano Pro, já contratado) | Incluído no Pro (uso comercial permitido) |
 | Contas e banco | Supabase | Grátis até 50 mil usuários/mês (pausa após 7 dias sem uso: o próprio uso diário evita) |
 | Cobrança | Asaas | Sem mensalidade; taxa por cobrança paga. Confira a tabela atual: numa mensalidade de R$ 10, a taxa pesa |
-| Domínio `.com.br` | Registro.br | Cerca de R$ 40 por ano (opcional: `imobempregos.pages.dev` é grátis) |
+| Domínio `.com.br` | Registro.br | Opcional, cerca de R$ 40 por ano. `imobemprego.vercel.app` já funciona |
 
 ### Como a cobrança funciona
 
@@ -37,16 +37,16 @@ Passos:
    - **Pelo painel:** SQL Editor > cole `20261103100327_schema_imobempregos.sql` > Run; depois `20261103110226_assinaturas.sql` > Run.
    - **Pela CLI:** `npx supabase@2 login`, `npx supabase@2 link --project-ref ikvjaowvpvxojvcfwnct`, `npx supabase@2 db push`. Atenção: o `db push` aplica todas as migrações pendentes da pasta; use o painel se o projeto tiver migrações de outros repositórios.
 2. **Settings > Data API > Exposed schemas:** acrescente `imobempregos` à lista que já existe (não remova os outros).
-3. **Authentication > URL Configuration > Redirect URLs:** acrescente `https://<seu-site>/entrar` (sem mexer na *Site URL*).
+3. **Authentication > URL Configuration > Redirect URLs:** acrescente `https://imobemprego.vercel.app/entrar` (sem mexer na *Site URL*). É para onde voltam os links dos e-mails de confirmação e de nova senha.
 4. **Authentication > Sign In / Providers > Email:** confirme que a **confirmação de e-mail** está ligada (já está: conferido em 03/11/2026).
-5. Copie de **Settings > API Keys** a chave **secret** para a Cloudflare (passo 4). A URL e a chave publishable já estão no `config.js`.
+5. Copie de **Settings > API Keys** a chave **secret** para a Vercel (passo 4). A URL e a chave publishable já estão no `config.js`.
 
 ## 2. Asaas
 
 1. Na sua conta do Asaas, comece pelo **sandbox** (ambiente de teste): [sandbox.asaas.com](https://sandbox.asaas.com). Crie lá uma chave de API.
-2. Em **Minha conta > Informações**, cadastre o domínio do site. O Checkout só volta para domínios cadastrados.
+2. Em **Minha conta > Informações**, informe o endereço do site (`https://imobemprego.vercel.app`). Não é preciso comprar domínio: é só para o Asaas aceitar devolver a pessoa ao app depois do pagamento com cartão.
 3. Em **Integrações > Webhooks**, crie um webhook:
-   - URL: `https://<seu-site>/api/asaas-webhook`
+   - URL: `https://imobemprego.vercel.app/api/asaas-webhook`
    - Token de autenticação: uma senha longa e aleatória (mais de 32 caracteres). É o `ASAAS_WEBHOOK_TOKEN` abaixo.
    - Eventos: `PAYMENT_CREATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, `PAYMENT_CHARGEBACK_REQUESTED`, `SUBSCRIPTION_CREATED`, `SUBSCRIPTION_DELETED`, `SUBSCRIPTION_INACTIVATED`, `CHECKOUT_PAID`.
 4. Em **Notificações**, deixe ligados os avisos de cobrança ao cliente (e-mail e, se quiser, WhatsApp): são eles que lembram quem paga por Pix.
@@ -56,14 +56,11 @@ Passos:
 
 Feito: `analisador-curriculo/config.js` já tem a URL do projeto e a chave publishable (pública por natureza; o acesso aos dados é controlado pelo RLS).
 
-## 4. Cloudflare Pages
+## 4. Vercel (projeto `wsasistemas/imobemprego`)
 
-1. Crie uma conta em [dash.cloudflare.com](https://dash.cloudflare.com) > **Workers & Pages > Create > Pages > Connect to Git** > repositório `wsasistemas/imobemprego`.
-2. Configuração do build:
-   - **Root directory:** `analisador-curriculo`
-   - **Build command:** `node build.mjs`
-   - **Build output directory:** `dist`
-3. **Settings > Variables and Secrets** (marque as chaves como *Secret*):
+1. **Settings > Build and Deployment > Root Directory:** `analisador-curriculo`. É a mudança mais importante: sem ela, a Vercel publica o repositório inteiro como site e as funções de `/api` não existem.
+   - O resto vem do `analisador-curriculo/vercel.json`: build `node build.mjs`, saída `dist` (só os arquivos públicos), funções em `api/` e cabeçalhos de segurança. Deixe os campos de build do painel sem sobrescrever (*Override* desligado).
+2. **Settings > Environment Variables** (ambiente *Production*; marque as chaves como *Sensitive*):
 
    | Variável | Valor |
    |---|---|
@@ -73,9 +70,12 @@ Feito: `analisador-curriculo/config.js` já tem a URL do projeto e a chave publi
    | `ASAAS_API_KEY` | a chave de API do Asaas (secret) |
    | `ASAAS_AMBIENTE` | `sandbox` no teste, `producao` no lançamento |
    | `ASAAS_WEBHOOK_TOKEN` | o mesmo token do webhook do Asaas (secret) |
-   | `SITE_URL` | `https://imobempregos.pages.dev` (ou seu domínio) |
+   | `SITE_URL` | `https://imobemprego.vercel.app` (ou seu domínio) |
 
-4. **Deploy.** A cada `git push` na branch `main`, a Cloudflare publica de novo. Domínio próprio em **Custom domains**; depois atualize `SITE_URL`, a *Site URL* do Supabase e o domínio no Asaas.
+   Não existe arquivo `.env` neste projeto: as variáveis ficam só no painel da Vercel. O repositório é público, então nenhuma chave secreta pode ir para arquivo.
+3. **Deployments > Redeploy** no último deploy (variável nova só vale num deploy novo). Depois, a cada `git push` na branch `main`, a Vercel publica sozinha.
+4. Confira: `https://imobemprego.vercel.app/` abre a tela de entrar, e `https://imobemprego.vercel.app/api/vagas?termo=teste` responde `{"erro":"Entre na sua conta para buscar vagas."}` (a função existe e exige login).
+5. Domínio próprio, se quiser: **Settings > Domains**. Depois atualize `SITE_URL`, as *Redirect URLs* do Supabase e o endereço no Asaas.
 
 O `build.mjs` copia para o site **só** a lista de arquivos públicos. O Vigia de Vagas, os testes e os scripts do Windows nunca vão para a internet.
 
@@ -91,11 +91,11 @@ O `build.mjs` copia para o site **só** a lista de arquivos públicos. O Vigia d
 
 Com o `config.js` vazio, o app abre sem login e sem cobrança em `localhost`: `iniciar.bat`.
 
-Para rodar as funções como na Cloudflare: `node build.mjs` e depois `npx wrangler@4 pages dev dist`. Os segredos locais vão em `analisador-curriculo/.dev.vars`, que já está no `.gitignore`.
+Para rodar as funções como na Vercel: `npx vercel@latest dev` dentro de `analisador-curriculo` (pede login na Vercel e puxa as variáveis do painel).
 
 ## Testes
 
-- App e servidor: `cd analisador-curriculo && node --test teste.mjs teste-servidor.mjs` (32 testes: análise, Gupy, Vigia, cadastro, acesso, assinar com Pix e cartão, cancelar e os avisos do Asaas, com Supabase e Asaas simulados).
+- App e servidor: `cd analisador-curriculo && node --test teste.mjs teste-servidor.mjs` (36 testes: análise, Gupy, Vigia, cadastro, acesso, busca de vagas, assinar com Pix e cartão, cancelar, avisos do Asaas e as funções da Vercel, com Supabase e Asaas simulados).
 - Banco: `cd supabase/tests && npm install && npm test` (55 verificações: cadastro, RLS, teste grátis de 10 dias, regra de acesso, ninguém consegue se dar acesso, cadastros dos outros apps intactos e ativação de quem já tem login Imob).
 
 ## Antes de divulgar
@@ -105,4 +105,4 @@ Para rodar as funções como na Cloudflare: `node build.mjs` e depois `npx wrang
 - **Termos da Gupy:** o `robots.txt` libera as páginas usadas, mas um serviço pago que lê vagas da Gupy é uso comercial. Leia os termos de uso da Gupy e considere falar com eles.
 - **WhatsApp:** é validado pelo formato. Confirmar que o número é da pessoa exige envio de código, que é pago.
 - **Excluir conta (LGPD):** apagar o usuário no Supabase apaga perfil, assinatura e vagas salvas. Ainda falta um botão "apagar minha conta" no app.
-- **Repositório público:** nunca faça commit das chaves secret do Supabase e do Asaas, do `.dev.vars` ou do `vigia.json`.
+- **Repositório público:** nunca faça commit das chaves secret do Supabase e do Asaas, de um `.env` ou do `vigia.json`.

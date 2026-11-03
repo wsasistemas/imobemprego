@@ -1,6 +1,6 @@
 // Ações da assinatura: assinar, cancelar e o webhook do Asaas.
 // Cada uma recebe (request, env, fetchImpl) e devolve um Response, para rodar
-// igual na Cloudflare e nos testes (com fetch falso).
+// igual na Vercel e nos testes (com fetch falso).
 
 import V from '../../validacao.js';
 import { json, usuarioDoToken, admin, lerAssinatura, atualizarAssinatura, ehUuid } from './comum.mjs';

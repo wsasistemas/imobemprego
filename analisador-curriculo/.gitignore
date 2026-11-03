@@ -3,7 +3,7 @@ vigia.json
 dados/
 relatorios/
 
-# Cloudflare: segredos locais do wrangler e o site montado (node build.mjs)
-.dev.vars
-.wrangler/
+# Vercel (pasta local do CLI) e o site montado (node build.mjs)
+.vercel/
+.env*
 dist/
