@@ -404,6 +404,13 @@ input[aria-invalid=true]{border-color:var(--bad)}
     ocupado(e.target, false);
     if (error) return aviso('a-cadastro', V.mensagemErroAuth(error));
     if (data.session) return location.replace(voltarPara);
+    // E-mail que já tem conta (em qualquer app Imob): o Supabase responde
+    // "sucesso" sem identities e não envia e-mail. Manda a pessoa entrar.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      $('e-email').value = r.dados.email;
+      mostrar('entrar', 'e-senha');
+      return aviso('a-entrar', 'Este e-mail já tem conta Imob. Entre com a sua senha; se não lembrar, use "Esqueci minha senha".', 'info');
+    }
     $('conf-email').textContent = r.dados.email;
     $('e-email').value = r.dados.email;
     mostrar('confirme');

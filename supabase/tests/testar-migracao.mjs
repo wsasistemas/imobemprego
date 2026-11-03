@@ -96,7 +96,7 @@ await como('authenticated', B, async () => {
   ok(!!(await erro(() => sql(`select imobempregos.criar_perfil_no_cadastro()`))), 'função do cadastro não é chamável');
 });
 
-ok(!!(await erro(() => sql(`insert into imobempregos.vagas (url,titulo) values ('https://evil.com/jobs/1','x')`))), 'link fora da Gupy recusado');
+ok(!!(await erro(() => sql(`insert into imobempregos.vagas (url,titulo) values ('http://evil.com/jobs/1','x')`))), 'link sem https recusado');
 
 // ---- assinatura: 10 dias grátis, acesso só com teste ou pagamento em dia
 const ass = (await sql(`select status, extract(epoch from teste_ate - criado_em)::int as dur, acesso_ate from imobempregos.assinaturas where usuario_id = $1`, [A])).rows[0];
@@ -152,6 +152,49 @@ await como('anon', null, async () => {
 });
 await como('authenticated', null, async () => {
   ok(!!(await erro(() => sql(`select imobempregos.ativar_conta('X Y', '31977776666')`))), 'sem usuário no token, ativar_conta recusa');
+});
+
+// ---- IA: limite mensal, só o servidor conta
+const consumir = (uid, lim) => sql(`select imobempregos.consumir_uso_ia($1, $2) as n`, [uid, lim]).then((r) => r.rows[0].n);
+ok((await consumir(B, 2)) === 1 && (await consumir(B, 2)) === 2, 'servidor conta os usos da IA');
+ok((await consumir(B, 2)) === -1, 'passou do limite do mês: recusa (-1)');
+ok((await sql(`select usos from imobempregos.uso_ia where usuario_id = $1`, [B])).rows[0].usos === 2, '  e não conta além do limite');
+await sql(`select imobempregos.devolver_uso_ia($1)`, [B]);
+ok((await consumir(B, 2)) === 2, 'IA falhou: o uso é devolvido');
+await como('authenticated', B, async () => {
+  ok((await sql(`select usos from imobempregos.uso_ia`)).rows[0].usos === 2, 'usuário lê o próprio uso (contador)');
+});
+for (const [q, caso] of [
+  [`select imobempregos.consumir_uso_ia('${B}', 999)`, 'usuário não chama consumir_uso_ia'],
+  [`select imobempregos.devolver_uso_ia('${B}')`, 'usuário não chama devolver_uso_ia'],
+  [`update imobempregos.uso_ia set usos = 0`, 'usuário não zera o próprio uso'],
+]) {
+  await como('authenticated', B, async () => { ok(!!(await erro(() => sql(q))), caso); });
+}
+await como('authenticated', D, async () => {
+  ok((await sql(`select * from imobempregos.uso_ia`)).rows.length === 0, 'D não vê o uso de B');
+});
+
+// ---- candidaturas: só pagantes
+const marcar = (uid, url) => como('authenticated', uid, () => sql(`select imobempregos.marcar_candidatura($1, 'Analista Fiscal', 'PagBank', 72, '{SPED}')`, [url]));
+const pagante = (uid) => como('authenticated', uid, async () => (await sql(`select imobempregos.e_pagante() as p`)).rows[0].p);
+ok((await pagante(B)) === false, 'teste grátis não é pagante');
+ok(!!(await erro(() => marcar(B, 'https://pagbank.gupy.io/jobs/77'))), 'teste grátis não marca candidatura');
+await sql(`update imobempregos.assinaturas set status = 'ativa', acesso_ate = now() + interval '30 days' where usuario_id = $1`, [B]);
+ok((await pagante(B)) === true, 'pagou: é pagante');
+await db.exec(`begin; set local role authenticated; select set_config('request.jwt.claim.sub', '${B}', true);
+  select imobempregos.marcar_candidatura('https://pagbank.gupy.io/jobs/77', 'Analista Fiscal', 'PagBank', 72, '{SPED}'); commit;`);
+const cand = (await sql(`select status, nota, candidatou_em is not null as data from imobempregos.vagas_usuario where usuario_id = $1`, [B])).rows[0];
+ok(cand && cand.status === 'candidatei' && cand.nota === 72 && cand.data, 'pagante marca candidatura (cria a vaga no cache)');
+ok(!!(await erro(() => marcar(B, 'javascript:alert(1)'))), 'candidatura com link inválido recusada');
+await db.exec(`begin; set local role authenticated; select set_config('request.jwt.claim.sub', '${B}', true);
+  select imobempregos.marcar_candidatura('https://www.linkedin.com/jobs/view/123', 'Analista', 'Empresa'); commit;`);
+ok((await sql(`select fonte from imobempregos.vagas where url = 'https://www.linkedin.com/jobs/view/123'`)).rows[0].fonte === 'link', 'candidatura de vaga do LinkedIn (pelo link) funciona');
+await como('authenticated', B, async () => {
+  ok((await sql(`update imobempregos.vagas_usuario set status = 'entrevista' returning status`)).rows[0].status === 'entrevista', 'pagante muda o status');
+});
+await como('anon', null, async () => {
+  ok(!!(await erro(() => sql(`select imobempregos.marcar_candidatura('https://e.gupy.io/jobs/5', 'x')`))), 'anon não marca candidatura');
 });
 
 console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo.');

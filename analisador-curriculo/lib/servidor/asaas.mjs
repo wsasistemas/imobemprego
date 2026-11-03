@@ -7,7 +7,7 @@
 // Docs: https://docs.asaas.com/docs/checkout-com-assinatura-recorrente
 //       https://docs.asaas.com/docs/criando-uma-assinatura
 
-export const PRECO = 10; // R$ por mês
+export const PRECO = 19.9; // R$ por mês (R$ 19,90)
 export const DIAS_TOLERANCIA = 3; // depois do vencimento, antes de cortar o acesso
 
 export function asaasBase(env) {

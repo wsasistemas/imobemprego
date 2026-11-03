@@ -120,7 +120,7 @@ export function refVaga(u) {
 
 // HTML colado do Word traz quebras de linha no meio das frases e marcadores
 // "·" como parágrafos soltos. Quebra de linha no HTML é só espaço.
-function textoDeHtml(html) {
+export function textoDeHtml(html) {
   return limparTexto(String(html || '').replace(/\s+/g, ' ').replace(/<\s*li[^>]*>/gi, '\n- '))
     .replace(/ *\n */g, '\n')
     .replace(/^ *[·•▪●§] *\n+/gm, '- ')

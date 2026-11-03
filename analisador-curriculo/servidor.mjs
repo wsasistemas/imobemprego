@@ -10,6 +10,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buscarGupy, buscarDetalheGupy, refVaga, ESTADOS } from './gupy.mjs';
+import { lerLink } from './lib/servidor/link.mjs';
 
 const PASTA = path.dirname(fileURLToPath(import.meta.url));
 const PORTA = Number(process.env.PORT) || 8765;
@@ -92,6 +93,12 @@ const servidor = http.createServer(async (req, res) => {
     }
   }
   if (url.pathname === '/api/estados') return json(res, 200, ESTADOS);
+  if (url.pathname === '/api/ler-link') {
+    // Mesma função da Vercel; sem Supabase configurado, não exige login.
+    const r = await lerLink(new Request('http://localhost' + req.url), {});
+    res.writeHead(r.status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(await r.text());
+  }
 
   const arq = ARQUIVOS[url.pathname];
   if (!arq) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Não encontrado'); }

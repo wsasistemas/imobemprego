@@ -3,16 +3,19 @@
 ## Como o app funciona
 
 - **Acesso só com login** (e-mail e senha). O cadastro pede nome, WhatsApp, e-mail e senha.
-- **10 dias grátis, sem cartão.** Depois, **R$ 10 por mês**, por Pix ou cartão, **sem fidelidade**: a pessoa cancela no app e usa até o fim do período pago.
+- **10 dias grátis, sem cartão.** Depois, **R$ 19,90 por mês**, por Pix ou cartão, **sem fidelidade**: a pessoa cancela no app e usa até o fim do período pago.
+- **Só para quem já pagou:** a IA (Claude Sonnet 5.5) adapta o currículo e escreve a carta para a vaga, **até 25 vezes por mês**, e a lista "Minhas candidaturas". No teste grátis essa parte aparece com cadeado e um botão "Gerar grátis no Gemini" (copia o pedido e abre o Gemini; custo zero). Conta de custo e lucro: [PLANO-PROXIMOS-PASSOS.md](PLANO-PROXIMOS-PASSOS.md).
+- **App em 5 passos** (Currículo › Vaga › Análise › Carta › Enviar), com Voltar/Próximo. O currículo fica guardado só no aparelho. A vaga vem da busca na Gupy, de um **link** (LinkedIn, Vagas.com, site da empresa: o servidor lê só a página pública, nunca com login de outro site; testado em 03/11/2026: LinkedIn e Vagas.com leem, Indeed bloqueia e o app pede para colar o texto) ou do texto colado. No Android, com o app instalado, a vaga pode vir pelo **Compartilhar › ImobEmpregos**.
 - Páginas: `entrar.html` (entrar, criar conta, senhas), `index.html` (o app), `assinatura.html` (plano, pagar, cancelar), `termos.html`, `privacidade.html`.
 - **Instalável no celular** (Android: Chrome > "Instalar app"; iPhone: Safari > Compartilhar > "Adicionar à Tela de Início").
-- O **currículo nunca sai do aparelho**. O **CPF** vai só para o Asaas, no momento de assinar; não fica no nosso banco.
+- O **currículo só sai do aparelho quando um assinante pede para a IA adaptar**: vai à IA e volta, sem ficar guardado no servidor. O resultado fica salvo só no aparelho. O **CPF** vai só para o Asaas, no momento de assinar; não fica no nosso banco.
 
 | Peça | Serviço | Custo para começar |
 |---|---|---|
 | Site e funções | Vercel (plano Pro, já contratado) | Incluído no Pro (uso comercial permitido) |
 | Contas e banco | Supabase | Grátis até 50 mil usuários/mês (pausa após 7 dias sem uso: o próprio uso diário evita) |
-| Cobrança | Asaas | Sem mensalidade; taxa por cobrança paga. Confira a tabela atual: numa mensalidade de R$ 10, a taxa pesa |
+| Cobrança | Asaas | Sem mensalidade; taxa por cobrança paga (Pix cerca de R$ 1,99; confira a tabela atual) |
+| IA | Anthropic (Claude Sonnet 5.5) | Por uso: cerca de R$ 0,24 por currículo e carta; no máximo 25 por assinante por mês |
 | Domínio `.com.br` | Registro.br | Opcional, cerca de R$ 40 por ano. `imobemprego.vercel.app` já funciona |
 
 ### Como a cobrança funciona
@@ -34,7 +37,7 @@ Cuidados, porque estas configurações valem para **todos** os apps do projeto:
 
 Passos:
 1. Aplique as migrações de `supabase/migrations/`, **em ordem**:
-   - **Pelo painel:** SQL Editor > cole `20261103100327_schema_imobempregos.sql` > Run; depois `20261103110226_assinaturas.sql` > Run.
+   - **Pelo painel:** SQL Editor > cole `20261103100327_schema_imobempregos.sql` > Run; depois `20261103110226_assinaturas.sql` > Run; depois `20261103180000_ia_e_candidaturas.sql` > Run (IA e candidaturas); depois `20261103190000_candidaturas_qualquer_site.sql` > Run (candidatura de vaga de qualquer site; pode rodar de novo sem erro).
    - **Pela CLI:** `npx supabase@2 login`, `npx supabase@2 link --project-ref ikvjaowvpvxojvcfwnct`, `npx supabase@2 db push`. Atenção: o `db push` aplica todas as migrações pendentes da pasta; use o painel se o projeto tiver migrações de outros repositórios.
 2. **Settings > Data API > Exposed schemas:** acrescente `imobempregos` à lista que já existe (não remova os outros).
 3. **Authentication > URL Configuration > Redirect URLs:** acrescente `https://imobemprego.vercel.app/entrar` (sem mexer na *Site URL*). É para onde voltam os links dos e-mails de confirmação e de nova senha.
@@ -59,6 +62,7 @@ Feito: `analisador-curriculo/config.js` já tem a URL do projeto e a chave publi
 ## 4. Vercel (projeto `wsasistemas/imobemprego`)
 
 1. **Settings > Build and Deployment:** *Root Directory* **vazio** (a raiz do repositório) e os campos de build **sem sobrescrever** (*Override* desligado). Tudo vem do `vercel.json` na raiz do repositório:
+   - instala as dependências do `package.json` da raiz (o SDK da Anthropic);
    - build `node analisador-curriculo/build.mjs`, que copia só os arquivos públicos para `analisador-curriculo/dist`, a pasta servida;
    - funções em `api/` (raiz), que chamam a lógica de `analisador-curriculo/lib/servidor/`;
    - cabeçalhos de segurança e endereços sem `.html` (`/entrar`, `/assinatura`).
@@ -73,6 +77,7 @@ Feito: `analisador-curriculo/config.js` já tem a URL do projeto e a chave publi
    | `ASAAS_AMBIENTE` | `sandbox` no teste, `producao` no lançamento |
    | `ASAAS_WEBHOOK_TOKEN` | o mesmo token do webhook do Asaas (secret) |
    | `SITE_URL` | `https://imobemprego.vercel.app` (ou seu domínio) |
+   | `ANTHROPIC_API_KEY` | chave da API da Anthropic (secret), criada em platform.claude.com > API Keys. Coloque créditos e um limite de gasto mensal na conta |
 
    Não existe arquivo `.env` neste projeto: as variáveis ficam só no painel da Vercel. O repositório é público, então nenhuma chave secreta pode ir para arquivo.
 3. **Deployments > Redeploy** no último deploy (variável nova só vale num deploy novo). Depois, a cada `git push` na branch `main`, a Vercel publica sozinha.
@@ -97,8 +102,8 @@ Para rodar as funções como na Vercel: `npx vercel@latest dev` na raiz do repos
 
 ## Testes
 
-- App e servidor: `cd analisador-curriculo && node --test teste.mjs teste-servidor.mjs` (36 testes: análise, Gupy, Vigia, cadastro, acesso, busca de vagas, assinar com Pix e cartão, cancelar, avisos do Asaas e as funções da Vercel, com Supabase e Asaas simulados).
-- Banco: `cd supabase/tests && npm install && npm test` (55 verificações: cadastro, RLS, teste grátis de 10 dias, regra de acesso, ninguém consegue se dar acesso, cadastros dos outros apps intactos e ativação de quem já tem login Imob).
+- App e servidor: `cd analisador-curriculo && node --test teste.mjs teste-servidor.mjs` (47 testes: leitura de vaga por link com bloqueio de endereço interno, análise, Gupy, Vigia, cadastro, acesso, busca de vagas, assinar com Pix e cartão, cancelar, avisos do Asaas, IA para assinantes com limite de 25 por mês e as funções da Vercel, com Supabase, Asaas e IA simulados).
+- Banco: `cd supabase/tests && npm install && npm test` (72 verificações: candidaturas de vaga de qualquer site pelo link, cadastro, RLS, teste grátis de 10 dias, regra de acesso, ninguém consegue se dar acesso, cadastros dos outros apps intactos, ativação de quem já tem login Imob, limite mensal da IA e candidaturas só para assinantes).
 
 ## Antes de divulgar
 

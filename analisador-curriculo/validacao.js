@@ -103,7 +103,8 @@
     const emTeste = fimTeste > agora, pago = !!fimPago && fimPago > agora;
     const data = function (d) { return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); };
     const dias = emTeste ? Math.max(1, Math.ceil((fimTeste - agora) / dia)) : 0;
-    const base = { acesso: emTeste || pago, diasTeste: dias, fimTeste: data(fimTeste), fimPago: fimPago ? data(fimPago) : null };
+    // pago: já pagou e o período vale. Libera a IA e as candidaturas (o teste grátis não).
+    const base = { acesso: emTeste || pago, pago: pago, diasTeste: dias, fimTeste: data(fimTeste), fimPago: fimPago ? data(fimPago) : null };
     if (a.status === 'ativa' && (pago || emTeste)) {
       return Object.assign(base, { tipo: 'ativa', texto: pago ? 'Assinatura ativa. Próxima renovação até ' + data(fimPago) + '.' : 'Assinatura feita. A primeira mensalidade vence em ' + data(fimTeste) + ', quando o teste acaba.' });
     }

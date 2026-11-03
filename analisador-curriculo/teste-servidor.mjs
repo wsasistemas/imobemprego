@@ -9,6 +9,8 @@ import {
   processarEvento, acessoAteParaVencimento, primeiroVencimento, filtroDasChaves, tokenConfere, PRECO,
 } from './lib/servidor/asaas.mjs';
 import { assinar, cancelar, webhookAsaas } from './lib/servidor/acoes.mjs';
+import { gerarDocumentos, ehPagante, ErroIA, LIMITE_IA_MES } from './lib/servidor/ia.mjs';
+import { lerLink, extrairVagaDeHtml, conferirUrl, baixarPagina, ipPrivado, ErroLink } from './lib/servidor/link.mjs';
 
 const V = createRequire(import.meta.url)('./validacao.js');
 
@@ -288,4 +290,130 @@ test('funções da Vercel: usam process.env', async () => {
   } finally {
     process.env = antes;
   }
+});
+
+// ------------------------------------------------------------------ IA (currículo e carta)
+
+const ENV_IA = { ...ENV, ANTHROPIC_API_KEY: 'sk-ant-teste' };
+const CV = 'Ana Souza\nSão Paulo - SP\n' + 'Assistente fiscal com experiência em NF-e e SPED. '.repeat(8);
+const VAGA = 'Analista Fiscal Jr. Requisitos: SPED Fiscal, ICMS, conciliação de notas. '.repeat(3);
+const pedidoIA = (corpo) => comToken('https://x/api/gerar', { method: 'POST', body: JSON.stringify(corpo) });
+const RESPOSTA_IA = { curriculo: 'ANA SOUZA\n⟦Resumo novo⟧', carta: 'Olá, equipe...', mudancas: ['Resumo'], alertas: [] };
+const ia = (resp) => { const f = async (env, d) => { f.chamadas.push(d); if (resp instanceof Error) throw resp; return resp; }; f.chamadas = []; return f; };
+const assinaturaIA = (extra) => [/\/rest\/v1\/assinaturas\?/, 'GET', { body: [linha(extra)] }];
+const PAGO = { status: 'ativa', acesso_ate: '2099-01-01T00:00:00Z' };
+
+test('IA: pagante gera currículo e carta e o uso é contado', async () => {
+  const f = fetchFalso([usuario, assinaturaIA(PAGO), [/rpc\/consumir_uso_ia$/, 'POST', { body: 3 }]]);
+  const chamar = ia(RESPOSTA_IA);
+  const r = await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: VAGA }), ENV_IA, f, chamar);
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.deepEqual([d.curriculo, d.usos, d.limite], [RESPOSTA_IA.curriculo, 3, LIMITE_IA_MES]);
+  assert.equal(chamar.chamadas[0].curriculo, CV.trim(), 'o currículo vai para a IA');
+  assert.deepEqual(f.de(/rpc\/consumir_uso_ia$/)[0].corpo, { p_usuario: UID, p_limite: 25 });
+  assert.equal(LIMITE_IA_MES, 25);
+});
+
+test('IA: teste grátis não usa (nem conta uso)', async () => {
+  const f = fetchFalso([usuario, assinaturaIA({ teste_ate: '2099-01-10T12:00:00Z' })]);
+  const chamar = ia(RESPOSTA_IA);
+  const r = await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: VAGA }), ENV_IA, f, chamar);
+  assert.equal(r.status, 403);
+  assert.equal((await r.json()).assinar, true);
+  assert.equal(chamar.chamadas.length, 0);
+  assert.equal(f.de(/consumir_uso_ia/).length, 0);
+});
+
+test('IA: assinou mas ainda não pagou (cartão no teste) não usa', async () => {
+  const f = fetchFalso([usuario, assinaturaIA({ status: 'ativa', teste_ate: '2099-01-10T12:00:00Z', acesso_ate: null })]);
+  assert.equal((await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: VAGA }), ENV_IA, f, ia(RESPOSTA_IA))).status, 403);
+});
+
+test('IA: passou de 25 no mês é recusado sem chamar a IA', async () => {
+  const f = fetchFalso([usuario, assinaturaIA(PAGO), [/rpc\/consumir_uso_ia$/, 'POST', { body: -1 }]]);
+  const chamar = ia(RESPOSTA_IA);
+  const r = await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: VAGA }), ENV_IA, f, chamar);
+  assert.equal(r.status, 429);
+  assert.match((await r.json()).erro, /25 gerações/);
+  assert.equal(chamar.chamadas.length, 0);
+});
+
+test('IA: falhou depois de contar, o uso é devolvido', async () => {
+  const f = fetchFalso([usuario, assinaturaIA(PAGO), [/rpc\/consumir_uso_ia$/, 'POST', { body: 4 }], [/rpc\/devolver_uso_ia$/, 'POST', { status: 204 }]]);
+  const r = await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: VAGA }), ENV_IA, f, ia(new ErroIA(502, 'A IA não respondeu. Tente de novo.')));
+  assert.equal(r.status, 502);
+  assert.equal((await r.json()).erro, 'A IA não respondeu. Tente de novo.');
+  assert.deepEqual(f.de(/rpc\/devolver_uso_ia$/)[0].corpo, { p_usuario: UID });
+});
+
+test('IA: textos curtos, longos ou sem login são recusados antes de tudo', async () => {
+  const f = fetchFalso([usuario]);
+  const chamar = ia(RESPOSTA_IA);
+  assert.equal((await gerarDocumentos(pedidoIA({ curriculo: 'curto', vaga: VAGA }), ENV_IA, f, chamar)).status, 400);
+  assert.equal((await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: 'x' }), ENV_IA, f, chamar)).status, 400);
+  assert.equal((await gerarDocumentos(pedidoIA({ curriculo: 'a'.repeat(15001), vaga: VAGA }), ENV_IA, f, chamar)).status, 413);
+  assert.equal((await gerarDocumentos(pedidoIA({ curriculo: CV, vaga: VAGA }), ENV, f, chamar)).status, 503, 'sem chave da IA');
+  assert.equal((await gerarDocumentos(new Request('https://x/api/gerar', { method: 'POST', body: '{}' }), ENV_IA, f, chamar)).status, 401);
+  assert.equal(chamar.chamadas.length, 0);
+  assert.equal(f.de(/assinaturas/).length, 0);
+});
+
+test('IA: pagante só enquanto o período pago vale', () => {
+  const agora = new Date('2026-11-05T12:00:00Z');
+  assert.equal(ehPagante(linha({ acesso_ate: '2026-11-06T00:00:00Z' }), agora), true);
+  assert.equal(ehPagante(linha({ acesso_ate: '2026-11-04T00:00:00Z', status: 'cancelada' }), agora), false);
+  assert.equal(ehPagante(linha({ teste_ate: '2026-11-10T00:00:00Z' }), agora), false, 'teste grátis');
+  assert.equal(ehPagante(null, agora), false);
+  assert.equal(PRECO, 19.9);
+});
+
+// ------------------------------------------------------------------ vaga por link (LinkedIn, Vagas.com, site da empresa)
+
+const PUBLICO = async () => [{ address: '151.101.1.1', family: 4 }];
+const paginaVaga = (extra = '') => `<html><head><script type="application/ld+json">${JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'JobPosting', title: 'Analista Fiscal Pleno',
+  description: '<p>Requisitos:</p><ul><li>Apuração de ICMS, PIS e COFINS</li><li>SPED Fiscal e EFD-Contribuições</li></ul>',
+  hiringOrganization: { '@type': 'Organization', name: 'Empresa Exemplo' },
+  jobLocation: [{ '@type': 'Place', address: { addressLocality: 'São Paulo', addressRegion: 'SP' } }],
+})}</script>${extra}</head><body></body></html>`;
+
+test('link: lê o JobPosting da página pública', () => {
+  const v = extrairVagaDeHtml(paginaVaga());
+  assert.deepEqual([v.titulo, v.empresa, v.local], ['Analista Fiscal Pleno', 'Empresa Exemplo', 'São Paulo - SP']);
+  assert.match(v.texto, /- Apuração de ICMS/);
+  assert.equal(extrairVagaDeHtml('<html>login</html>'), null, 'sem JobPosting: pede para colar');
+  const grafo = `<script type="application/ld+json">{"@graph":[{"@type":"WebPage"},{"@type":["JobPosting"],"title":"Vaga X","description":"${'texto da vaga '.repeat(5)}"}]}</script>`;
+  assert.equal(extrairVagaDeHtml(grafo).titulo, 'Vaga X', 'acha a vaga dentro de @graph');
+});
+
+test('link: bloqueia endereço interno (o servidor não vira ponte para a rede)', async () => {
+  for (const ruim of ['http://localhost/x', 'http://127.0.0.1/x', 'http://[::1]/x', 'file:///etc/passwd', 'https://user:pw@site.com/x', 'https://site.com:8080/x', 'http://intranet/x']) {
+    await assert.rejects(conferirUrl(ruim, PUBLICO), (e) => e instanceof ErroLink && e.status === 400, ruim);
+  }
+  await assert.rejects(conferirUrl('https://rede-interna.com/x', async () => [{ address: '10.0.0.5', family: 4 }]), /não aceito/);
+  await assert.rejects(conferirUrl('https://x.com/x', async () => [{ address: '169.254.169.254', family: 4 }]), /não aceito/, 'metadados da nuvem');
+  assert.equal(ipPrivado('192.168.0.1'), true);
+  assert.equal(ipPrivado('8.8.8.8'), false);
+  assert.equal((await conferirUrl('https://www.linkedin.com/jobs/view/1', PUBLICO)).hostname, 'www.linkedin.com');
+});
+
+test('link: redirecionamento para endereço interno é bloqueado', async () => {
+  const f = async () => new Response('', { status: 302, headers: { location: 'http://127.0.0.1/admin' } });
+  await assert.rejects(baixarPagina('https://site.com/vaga', f, PUBLICO), /não aceito/);
+});
+
+test('link: rota completa (logado com acesso) e site que bloqueia', async () => {
+  const f = fetchFalso([[/rpc\/tem_acesso$/, 'POST', { body: true }]]);
+  const fx = async (url, opts) => (/site\.com/.test(url) ? new Response(paginaVaga()) : f(url, opts));
+  const r = await lerLink(comToken('https://x/api/ler-link?url=' + encodeURIComponent('https://site.com/vagas/1')), ENV, fx, PUBLICO);
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.deepEqual([d.titulo, d.site], ['Analista Fiscal Pleno', 'site.com']);
+  const bloqueia = async (url, opts) => (/linkedin/.test(url) ? new Response('authwall', { status: 999 }) : f(url, opts));
+  const r2 = await lerLink(comToken('https://x/api/ler-link?url=' + encodeURIComponent('https://www.linkedin.com/jobs/view/1')), ENV, bloqueia, PUBLICO);
+  assert.equal(r2.status, 422);
+  assert.equal((await r2.json()).colar, true, 'app mostra "cole o texto"');
+  const semLogin = await lerLink(new Request('https://x/api/ler-link?url=x'), ENV, f, PUBLICO);
+  assert.equal(semLogin.status, 401);
 });

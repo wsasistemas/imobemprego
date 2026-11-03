@@ -80,19 +80,21 @@ input[aria-invalid=true]{border-color:var(--bad)}
 
   <section class="cartao" aria-labelledby="t-plano" style="margin-top:16px">
     <p class="kicker">Plano ImobEmpregos</p>
-    <h1 id="t-plano">R$ 10 <small>por mês</small></h1>
+    <h1 id="t-plano">R$ 19,90 <small>por mês</small></h1>
     <ul class="beneficios">
       <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Vagas novas da Gupy ordenadas pelo seu currículo</li>
       <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Análise do currículo para cada vaga, no seu celular</li>
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>IA adapta seu currículo e escreve a carta para cada vaga (até 25 por mês)</li>
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Minhas candidaturas: acompanhe cada vaga em que você se candidatou</li>
       <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Sem fidelidade: cancele quando quiser, aqui mesmo</li>
-      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>10 dias grátis, sem cartão</li>
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>10 dias grátis, sem cartão (a IA e as candidaturas liberam no primeiro pagamento)</li>
     </ul>
   </section>
 
   <div class="situacao" id="situacao" role="status">Carregando sua assinatura…</div>
 
   <div class="acoes" id="pagarPix" hidden>
-    <a class="btn ouro" id="linkPix" href="#" target="_blank" rel="noopener">Pagar o Pix de R$ 10 <svg width="16" height="16" aria-hidden="true"><use href="#i-externo"/></svg></a>
+    <a class="btn ouro" id="linkPix" href="#" target="_blank" rel="noopener">Pagar o Pix de R$ 19,90 <svg width="16" height="16" aria-hidden="true"><use href="#i-externo"/></svg></a>
     <p class="ajuda">Abre a cobrança do Asaas com o QR Code e o código copia e cola.</p>
   </div>
 
@@ -110,7 +112,7 @@ input[aria-invalid=true]{border-color:var(--bad)}
       <p class="erro-campo" id="x-cpf"></p>
     </div>
     <p class="ajuda" id="quandoCobra"></p>
-    <button class="btn ouro" type="submit">Assinar por R$ 10/mês</button>
+    <button class="btn ouro" type="submit">Assinar por R$ 19,90/mês</button>
   </form>
 
   <div class="acoes" id="areaCancelar" hidden>
@@ -186,7 +188,7 @@ input[aria-invalid=true]{border-color:var(--bad)}
       location.href = url;
     } catch (err) {
       $('aviso').textContent = err.message;
-      botao.disabled = false; botao.textContent = 'Assinar por R$ 10/mês';
+      botao.disabled = false; botao.textContent = 'Assinar por R$ 19,90/mês';
     }
   });
 

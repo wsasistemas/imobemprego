@@ -69,7 +69,7 @@ export async function exigirAcesso(request, env, fetchImpl = fetch) {
     if (!r.ok) return json(503, { erro: 'Não foi possível conferir sua assinatura agora. Tente de novo.' });
     return (await r.json()) === true
       ? null
-      : json(402, { erro: 'Seu teste grátis acabou. Assine por R$ 10 por mês para continuar.', assinar: true });
+      : json(402, { erro: 'Seu teste grátis acabou. Assine por R$ 19,90 por mês para continuar.', assinar: true });
   } catch {
     return json(503, { erro: 'Não foi possível conferir sua assinatura agora. Tente de novo.' });
   }
