@@ -58,8 +58,10 @@ Feito: `analisador-curriculo/config.js` já tem a URL do projeto e a chave publi
 
 ## 4. Vercel (projeto `wsasistemas/imobemprego`)
 
-1. **Settings > Build and Deployment > Root Directory:** `analisador-curriculo`. É a mudança mais importante: sem ela, a Vercel publica o repositório inteiro como site e as funções de `/api` não existem.
-   - O resto vem do `analisador-curriculo/vercel.json`: build `node build.mjs`, saída `dist` (só os arquivos públicos), funções em `api/` e cabeçalhos de segurança. Deixe os campos de build do painel sem sobrescrever (*Override* desligado).
+1. **Settings > Build and Deployment:** *Root Directory* **vazio** (a raiz do repositório) e os campos de build **sem sobrescrever** (*Override* desligado). Tudo vem do `vercel.json` na raiz do repositório:
+   - build `node analisador-curriculo/build.mjs`, que copia só os arquivos públicos para `analisador-curriculo/dist`, a pasta servida;
+   - funções em `api/` (raiz), que chamam a lógica de `analisador-curriculo/lib/servidor/`;
+   - cabeçalhos de segurança e endereços sem `.html` (`/entrar`, `/assinatura`).
 2. **Settings > Environment Variables** (ambiente *Production*; marque as chaves como *Sensitive*):
 
    | Variável | Valor |
@@ -91,7 +93,7 @@ O `build.mjs` copia para o site **só** a lista de arquivos públicos. O Vigia d
 
 Com o `config.js` vazio, o app abre sem login e sem cobrança em `localhost`: `iniciar.bat`.
 
-Para rodar as funções como na Vercel: `npx vercel@latest dev` dentro de `analisador-curriculo` (pede login na Vercel e puxa as variáveis do painel).
+Para rodar as funções como na Vercel: `npx vercel@latest dev` na raiz do repositório (pede login na Vercel e puxa as variáveis do painel).
 
 ## Testes
 

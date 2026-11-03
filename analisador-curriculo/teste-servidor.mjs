@@ -246,8 +246,8 @@ test('webhook: falha no banco devolve 500 para o Asaas reenviar', async () => {
 
 // ------------------------------------------------------------------ busca de vagas e funções da Vercel
 import { buscarVagas, lerVaga } from './lib/servidor/vagas.mjs';
-import { GET as apiVagas } from './api/vagas.mjs';
-import { POST as apiWebhook } from './api/asaas-webhook.mjs';
+import { GET as apiVagas } from '../api/vagas.mjs';
+import { POST as apiWebhook } from '../api/asaas-webhook.mjs';
 
 const paginaGupy = (pageProps) => `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps } })}</script></html>`;
 
