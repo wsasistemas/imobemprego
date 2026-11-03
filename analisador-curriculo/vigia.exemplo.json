@@ -1,0 +1,12 @@
+{
+  "curriculo": "C:/Users/SEU_USUARIO/Documents/curriculo.pdf",
+  "buscas": [
+    { "termo": "analista administrativo", "estado": "São Paulo" },
+    { "termo": "analista administrativo", "remoto": true }
+  ],
+  "paginas": 1,
+  "diasMaximos": 14,
+  "notaMinima": 30,
+  "maxVagasPorExecucao": 40,
+  "abrirRelatorio": true
+}

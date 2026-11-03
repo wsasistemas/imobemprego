@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analisador de Currículo</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230f766e'/><path d='M9 8h10l4 4v12H9z' fill='white'/><path d='M12 15h8M12 19h6' stroke='%230f766e' stroke-width='2'/></svg>">
+<style>
+:root{
+  --bg:#f6f7f5; --card:#ffffff; --ink:#1c2321; --muted:#5d6865; --line:#e2e6e3;
+  --accent:#0f766e; --accent-ink:#ffffff; --accent-soft:#e3f2ef;
+  --ok:#15803d; --ok-soft:#e7f5ec; --warn:#b45309; --warn-soft:#fdf1e2; --bad:#b91c1c; --bad-soft:#fbe9e9;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111514; --card:#1a201e; --ink:#e7ecea; --muted:#9aa6a2; --line:#2b3330;
+  --accent:#2dd4bf; --accent-ink:#06201d; --accent-soft:#16322e;
+  --ok:#4ade80; --ok-soft:#173022; --warn:#fbbf24; --warn-soft:#33270f; --bad:#f87171; --bad-soft:#3a1a1a;
+  --shadow:none;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 16px 64px}
+header h1{margin:0;font-size:26px;letter-spacing:-.01em}
+header p{margin:4px 0 0;color:var(--muted)}
+.priv{display:inline-flex;gap:6px;align-items:center;margin-top:10px;font-size:13px;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:99px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);min-width:0}
+.card h2{margin:0 0 4px;font-size:17px;display:flex;align-items:center;gap:8px}
+.step{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:700}
+.hint{color:var(--muted);font-size:13px;margin:0 0 12px}
+textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--ink);font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+input[type=text],select{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
+textarea:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:14px;text-align:center;color:var(--muted);margin-bottom:10px;cursor:pointer;transition:.15s}
+.drop.on,.drop:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.drop strong{color:var(--ink)}
+.meta{font-size:12px;color:var(--muted);margin-top:6px;min-height:18px}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.big{padding:12px 28px;font-size:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 12px}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 10px;color:var(--muted)}
+.tabs button[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.center{text-align:center;margin:20px 0 4px}
+#resultado{margin-top:24px;display:none}
+.scores{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media (max-width:700px){.scores{grid-template-columns:1fr}}
+.score{display:flex;gap:14px;align-items:center}
+.score svg{flex:none}
+.score b{display:block;font-size:15px}
+.score small{color:var(--muted);font-size:12.5px;line-height:1.35;display:block}
+.sec{margin-top:16px}
+.sec h3{margin:0 0 10px;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:13px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);white-space:nowrap}
+.chip em{font-style:normal;opacity:.7;font-size:11.5px;margin-left:4px}
+.chip.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.chip.falta{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.chip.falta.leve{background:var(--warn-soft);color:var(--warn)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:700px){.cols{grid-template-columns:1fr}}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--accent);padding:4px 10px;margin:12px 0 0}
+ul.check{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+@media (max-width:700px){ul.check{grid-template-columns:1fr}}
+ul.check li{display:flex;gap:8px;font-size:14px}
+ul.check li::before{content:"✓";color:var(--ok);font-weight:700;width:14px}
+ul.check li.no::before{content:"✗";color:var(--bad)}
+ul.check li.na::before{content:"–";color:var(--muted)}
+ol.sug{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+ol.sug li{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.tag{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:6px;margin-top:2px}
+.tag.alta{background:var(--bad-soft);color:var(--bad)}.tag.media{background:var(--warn-soft);color:var(--warn)}.tag.baixa{background:var(--accent-soft);color:var(--accent)}
+.vagas{display:grid;gap:10px;margin-top:12px;max-height:520px;overflow:auto;padding-right:4px}
+.vaga{border:1px solid var(--line);border-radius:12px;padding:12px}
+.vaga h4{margin:0;font-size:15px}
+.vaga .info{font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+.badge{float:right;font-weight:700;font-size:13px;padding:2px 10px;border-radius:99px;margin-left:8px}
+.b-ok{background:var(--ok-soft);color:var(--ok)}.b-med{background:var(--warn-soft);color:var(--warn)}.b-bad{background:var(--bad-soft);color:var(--bad)}.b-na{background:var(--bg);color:var(--muted)}
+.falt{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.links{display:flex;gap:6px;flex-wrap:wrap}
+.links a{font-size:13px;color:var(--accent)}
+.alerta{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+.alerta.warn{background:var(--warn-soft);color:var(--warn)}
+.alerta.okk{background:var(--ok-soft);color:var(--ok)}
+.muted{color:var(--muted)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:10px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1}
+footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Analisador de Currículo</h1>
+    <p>Compare seu currículo com uma vaga, veja como um sistema de triagem (ATS) lê o arquivo e busque vagas na Gupy.</p>
+    <span class="priv">🔒 A análise roda no seu computador. O currículo não é enviado a nenhum servidor.</span>
+  </header>
+
+  <div class="grid2">
+    <section class="card" aria-labelledby="t-cv">
+      <h2 id="t-cv"><span class="step">1</span> Seu currículo</h2>
+      <p class="hint">Envie o PDF (ou .txt) ou cole o texto. O quadro mostra o que um ATS consegue ler do arquivo.</p>
+      <label class="drop" id="drop" tabindex="0">
+        <strong>Clique ou arraste o arquivo aqui</strong><br><span>PDF ou TXT</span>
+        <input type="file" id="arquivo" accept=".pdf,.txt,.md,application/pdf,text/plain" class="sr">
+      </label>
+      <label class="sr" for="cv">Texto do currículo</label>
+      <textarea id="cv" placeholder="…ou cole aqui o texto do currículo"></textarea>
+      <div class="meta" id="cvMeta"></div>
+    </section>
+
+    <section class="card" aria-labelledby="t-vaga">
+      <h2 id="t-vaga"><span class="step">2</span> A vaga</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabColar" aria-selected="true" aria-controls="painelColar">Colar vaga</button>
+        <button role="tab" id="tabBuscar" aria-selected="false" aria-controls="painelBuscar">Buscar na Gupy</button>
+      </div>
+      <div id="painelColar" role="tabpanel">
+        <p class="hint">Cole o texto completo da vaga (Gupy, LinkedIn, site da empresa…), com títulos como “Requisitos” e “Diferenciais”.</p>
+        <label class="sr" for="vaga">Texto da vaga</label>
+        <textarea id="vaga" placeholder="Cole aqui a descrição da vaga"></textarea>
+      </div>
+      <div id="painelBuscar" role="tabpanel" hidden>
+        <p class="hint">Busca no portal público da Gupy. Com o currículo preenchido, as vagas vêm ordenadas por aderência.</p>
+        <form id="formBusca" class="row">
+          <label class="sr" for="termo">Cargo ou palavra-chave</label>
+          <input type="text" id="termo" placeholder="Ex.: analista de dados" style="flex:1 1 180px" required maxlength="80">
+          <label class="sr" for="estado">Estado</label>
+          <select id="estado" style="flex:0 1 170px"><option value="">Todo o Brasil</option></select>
+          <label class="row" style="gap:4px;font-size:14px"><input type="checkbox" id="soRemoto"> Só remotas</label>
+          <button class="primary" type="submit">Buscar</button>
+        </form>
+        <div id="buscaStatus" class="meta"></div>
+        <div id="buscaLendo" class="meta" aria-live="polite"></div>
+        <div class="vagas" id="listaVagas"></div>
+        <div id="outrosSites" class="meta"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="center row" style="justify-content:center">
+    <button class="primary big" id="btnAnalisar">Analisar currículo</button>
+    <button id="btnExemplo" type="button">Carregar exemplo</button>
+  </div>
+
+  <section id="resultado" aria-live="polite">
+    <div class="card"><div class="scores" id="scores"></div></div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card" id="cardPalavras"></div>
+      <div class="card" id="cardVaga"></div>
+    </div>
+    <div class="card sec" id="cardAts"></div>
+    <div class="card sec" id="cardSug"></div>
+    <div class="card sec" id="cardProximos"></div>
+  </section>
+
+  <footer>
+    Regras de análise inspiradas no <em>AI Job Search</em> (MIT): o currículo só pode afirmar o que é verdade; o que falta fica como lacuna.
+    Notas são heurísticas, não a decisão de nenhum ATS real.
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="analisador.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let pdfMeta = null;
+
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2200); }
+function guardar(k,v){ try{ localStorage.setItem('ac_'+k,v); }catch(e){} }
+function ler(k){ try{ return localStorage.getItem('ac_'+k); }catch(e){ return null; } }
+
+// ------------------------------------------------------------ leitura do PDF
+async function lerPdf(file){
+  if (!window.pdfjsLib) throw new Error('Leitor de PDF não carregou (sem internet?). Cole o texto do currículo.');
+  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+  const partes = []; let linhasTot = 0, linhasDivididas = 0;
+  for (let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const largura = page.getViewport({scale:1}).width;
+    const itens = (await page.getTextContent()).items.filter(i => 'str' in i);
+    // Texto na ordem do arquivo: é o mais próximo do que um ATS extrai.
+    let txt = '', prev = null;
+    for (const it of itens){
+      const y = it.transform[5], x = it.transform[4];
+      if (prev){
+        if (prev.hasEOL || Math.abs(y - prev.transform[5]) > 3) txt += '\n';
+        else if (x - (prev.transform[4] + prev.width) > 1 && !/\s$/.test(txt) && !/^\s/.test(it.str)) txt += ' ';
+      }
+      txt += it.str; prev = it;
+    }
+    partes.push(txt);
+    // Heurística de colunas: na mesma altura, blocos separados por um vão grande.
+    const linhas = new Map();
+    for (const it of itens){ if (!it.str.trim()) continue; const y = Math.round(it.transform[5]/3); if(!linhas.has(y)) linhas.set(y,[]); linhas.get(y).push(it); }
+    for (const grupo of linhas.values()){
+      grupo.sort((a,b)=>a.transform[4]-b.transform[4]); linhasTot++;
+      for (let i=1;i<grupo.length;i++){ const vao = grupo[i].transform[4] - (grupo[i-1].transform[4]+grupo[i-1].width); if (vao > largura*0.12){ linhasDivididas++; break; } }
+    }
+  }
+  return { texto: partes.join('\n\n').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n'), paginas: pdf.numPages, taxaColunas: linhasTot ? linhasDivididas/linhasTot : 0 };
+}
+
+async function carregarArquivo(file){
+  if (!file) return;
+  $('cvMeta').textContent = 'Lendo ' + file.name + '…';
+  try{
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf'){
+      const r = await lerPdf(file);
+      $('cv').value = r.texto; pdfMeta = { paginas: r.paginas, taxaColunas: r.taxaColunas };
+      $('cvMeta').textContent = file.name + ' · ' + r.paginas + ' página(s) · ' + r.texto.split(/\s+/).filter(Boolean).length + ' palavras lidas';
+    } else {
+      $('cv').value = await file.text(); pdfMeta = null;
+      $('cvMeta').textContent = file.name + ' carregado';
+    }
+  }catch(e){ $('cvMeta').textContent = 'Não consegui ler o arquivo: ' + e.message; }
+}
+$('arquivo').addEventListener('change', e => carregarArquivo(e.target.files[0]));
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('on'); }));
+drop.addEventListener('drop', e => carregarArquivo(e.dataTransfer.files[0]));
+drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('arquivo').click(); } });
+$('cv').addEventListener('input', () => { if (!$('cv').value.trim()) { pdfMeta = null; $('cvMeta').textContent=''; } });
+
+// ------------------------------------------------------------ abas
+function aba(qual){
+  const colar = qual === 'colar';
+  $('tabColar').setAttribute('aria-selected', colar); $('tabBuscar').setAttribute('aria-selected', !colar);
+  $('painelColar').hidden = !colar; $('painelBuscar').hidden = colar;
+  guardar('aba', qual);
+}
+$('tabColar').onclick = () => aba('colar');
+$('tabBuscar').onclick = () => aba('buscar');
+
+// ------------------------------------------------------------ resultado
+function anel(nota, titulo, texto){
+  const v = nota == null ? 0 : nota, r = 30, c = 2*Math.PI*r;
+  const cor = nota == null ? 'var(--line)' : v >= 75 ? 'var(--ok)' : v >= 50 ? 'var(--warn)' : 'var(--bad)';
+  return `<div class="score"><svg width="76" height="76" viewBox="0 0 76 76" role="img" aria-label="${esc(titulo)}: ${nota==null?'sem dados':v+' de 100'}">
+    <circle cx="38" cy="38" r="${r}" fill="none" stroke="var(--line)" stroke-width="7"/>
+    <circle cx="38" cy="38" r="${r}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c*v/100} ${c}" transform="rotate(-90 38 38)"/>
+    <text x="38" y="43" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">${nota==null?'—':v}</text></svg>
+    <div><b>${esc(titulo)}</b><small>${esc(texto)}</small></div></div>`;
+}
+
+function render(r){
+  const n = r.notas;
+  $('scores').innerHTML =
+    anel(n.aderencia, 'Aderência à vaga', n.aderencia==null ? 'Cole ou escolha uma vaga para medir.' : 'Quanto dos requisitos da vaga aparece no seu currículo (requisitos pesam mais que diferenciais).') +
+    anel(n.ats, 'Leitura por ATS', 'Se o sistema de triagem consegue ler contato, seções e texto do arquivo.') +
+    anel(n.qualidade, 'Qualidade do texto', 'Resultados com números, verbos de ação, tamanho e dados pessoais.');
+
+  // Palavras-chave
+  const c = r.cruzamento;
+  if (c && c.itens.length){
+    const tem = c.itens.filter(i => i.encontrado), falta = c.itens.filter(i => !i.encontrado);
+    const chip = (i, cls) => `<span class="chip ${cls}">${esc(i.termo)}<em>${esc(i.secaoNome)}</em></span>`;
+    $('cardPalavras').innerHTML = `<h3>Palavras-chave da vaga</h3>
+      <div class="cols"><div><p class="hint">No seu currículo (${tem.length})</p><div class="chips">${tem.map(i=>chip(i,'ok')).join('') || '<span class="muted">Nenhuma</span>'}</div></div>
+      <div><p class="hint">Não encontradas (${falta.length})</p><div class="chips">${falta.map(i=>chip(i, i.secao==='req'?'falta':'falta leve')).join('') || '<span class="muted">Nenhuma 🎉</span>'}</div></div></div>
+      <p class="note">Termo ausente é lacuna. Se você tem a experiência, escreva com o mesmo termo da vaga e mostre onde usou. Se não tem, não coloque.</p>`;
+  } else {
+    $('cardPalavras').innerHTML = `<h3>Palavras-chave da vaga</h3><p class="muted">${r.vaga ? 'Nenhum termo reconhecido na vaga. Confira se o texto está completo.' : 'Cole uma vaga (ou busque na Gupy) para comparar.'}</p>`;
+  }
+
+  // Sobre a vaga
+  const v = r.vaga;
+  if (v){
+    const itens = [];
+    if (v.modalidade) itens.push('Modalidade: <b>'+esc(v.modalidade)+'</b>');
+    if (v.contrato) itens.push('Contrato: <b>'+esc(v.contrato)+'</b>');
+    if (v.anosExperiencia) itens.push('Experiência pedida: <b>'+v.anosExperiencia+'+ anos</b>');
+    const idi = Object.entries(v.idiomas).map(([k,x]) => k + (x.nivel ? ' ('+x.rotulo+')' : ''));
+    if (idi.length) itens.push('Idiomas: <b>'+esc(idi.join(', '))+'</b>');
+    v.escolaridade.forEach(e => itens.push('Formação: '+esc(e)));
+    if (!v.secoes.temTitulos) itens.push('<span class="muted">A vaga não tem títulos como “Requisitos”/“Diferenciais”; todos os termos contam com o mesmo peso.</span>');
+    const ig = v.integridade;
+    let integ = '<div class="alerta okk">✓ Nenhum sinal de texto escondido ou instrução para IA na vaga.</div>';
+    if (ig.alerta) integ = '<div class="alerta">⚠ Esta vaga tem trechos suspeitos (podem ser instruções escondidas para robôs):<br>' + ig.suspeitas.concat(ig.misturadas).map(s=>'“'+esc(s)+'”').join('<br>') + '</div>';
+    else if (ig.invisiveis) integ = '<div class="alerta warn">'+ig.invisiveis+' caractere(s) invisível(is) no texto. Normalmente é sujeira de copiar e colar.</div>';
+    $('cardVaga').innerHTML = '<h3>Sobre a vaga</h3><ul style="margin:0;padding-left:18px">' + itens.map(i=>'<li>'+i+'</li>').join('') + '</ul>' +
+      r.alertasVaga.map(a => '<div class="alerta '+(a.nivel==='alta'?'':'warn')+'">'+esc(a.texto)+'</div>').join('') + integ;
+  } else {
+    $('cardVaga').innerHTML = '<h3>Sobre a vaga</h3><p class="muted">Sem vaga para analisar. A análise abaixo vale para o currículo em geral.</p>';
+  }
+
+  // Checklist ATS
+  const cv = r.cv, li = (ok, txt, na) => `<li class="${na?'na':ok?'':'no'}">${txt}</li>`;
+  const sec = Object.keys(r.nomesSecoes).map(k => li(cv.secoes[k], 'Seção “'+esc(r.nomesSecoes[k])+'”'));
+  $('cardAts').innerHTML = '<h3>Como um ATS lê seu currículo</h3><ul class="check">' + [
+    li(cv.palavras >= 60, cv.palavras + ' palavras legíveis'),
+    li(cv.lixo === 0, cv.lixo ? cv.lixo + ' caracteres ilegíveis' : 'Sem caracteres ilegíveis'),
+    li(cv.contato.email, 'E-mail como texto'), li(cv.contato.telefone, 'Telefone com DDD'),
+    li(cv.contato.linkedin, 'Link do LinkedIn'), li(cv.contato.local, 'Cidade / UF'),
+    li(cv.paginas ? cv.paginas <= 2 : true, cv.paginas ? cv.paginas + ' página(s)' : 'Páginas: só para PDF', !cv.paginas),
+    li(cv.colunas == null ? true : cv.colunas <= 0.3, cv.colunas == null ? 'Colunas: só para PDF' : cv.colunas > 0.3 ? 'Parece ter 2 colunas' : 'Uma coluna', cv.colunas == null),
+    li(!cv.espacado, cv.espacado ? 'Títulos com letras espaçadas' : 'Títulos legíveis'),
+    li(cv.sensiveis.length === 0, cv.sensiveis.length ? 'Dados dispensáveis: ' + esc(cv.sensiveis.join(', ')) : 'Sem dados pessoais dispensáveis'),
+    li(cv.quantificadas >= 3, cv.quantificadas + ' linha(s) com resultado em número'),
+    li(cv.verbos.length >= 5, cv.verbos.length + ' verbo(s) de ação'),
+  ].concat(sec).join('') + '</ul>';
+
+  // Sugestões
+  const nomes = { alta:'Alta', media:'Média', baixa:'Baixa' };
+  $('cardSug').innerHTML = '<h3>O que melhorar, por prioridade</h3>' + (r.sugestoes.length
+    ? '<ol class="sug">' + r.sugestoes.map(s => `<li><span class="tag ${s.nivel}">${nomes[s.nivel]}</span><span>${esc(s.texto)}</span></li>`).join('') + '</ol>'
+    : '<p class="muted">As regras automáticas não encontraram problemas. Ainda assim, leia linha por linha.</p>');
+
+  // Próximos passos
+  const titulo = ($('vaga').value.split('\n').find(l => l.trim()) || $('termo').value || '').trim().slice(0, 60);
+  const links = titulo ? window.Analisador.linksBusca(titulo).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.site)}</a>`).join(' · ') : '';
+  $('cardProximos').innerHTML = `<h3>Próximos passos</h3>
+    <div class="row">
+      <button id="btnRel">⬇ Baixar relatório (.md)</button>
+      ${r.vaga ? '<button id="btnApply">Copiar comando /apply para o Claude Code</button>' : ''}
+    </div>
+    ${r.vaga ? '<p class="hint" style="margin-top:8px">No Claude Code, dentro da pasta <code>ai-job-search</code>, cole o comando: ele escreve currículo e carta para esta vaga usando só o seu perfil.</p>' : ''}
+    ${links ? '<p class="hint" style="margin-top:8px">Procurar vagas parecidas: ' + links + '</p>' : ''}`;
+  $('btnRel').onclick = () => {
+    const blob = new Blob([window.Analisador.relatorioMarkdown(r, titulo)], {type:'text/markdown;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'analise-curriculo.md'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  };
+  if ($('btnApply')) $('btnApply').onclick = async () => {
+    try { await navigator.clipboard.writeText('/apply ' + $('vaga').value.trim()); toast('Comando copiado'); }
+    catch(e){ toast('Não consegui copiar; selecione o texto da vaga manualmente'); }
+  };
+
+  $('resultado').style.display = 'block';
+}
+
+function analisar(){
+  const cvTexto = $('cv').value;
+  if (!cvTexto.trim()){ toast('Envie ou cole o currículo primeiro'); $('cv').focus(); return; }
+  render(window.Analisador.analisar({ cvTexto, vagaTexto: $('vaga').value, pdfMeta }));
+  $('resultado').scrollIntoView({behavior:'smooth', block:'start'});
+}
+$('btnAnalisar').onclick = analisar;
+
+// ------------------------------------------------------------ busca na Gupy
+const ESTADOS = ['Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará','Distrito Federal','Espírito Santo','Goiás','Maranhão','Mato Grosso','Mato Grosso do Sul','Minas Gerais','Pará','Paraíba','Paraná','Pernambuco','Piauí','Rio de Janeiro','Rio Grande do Norte','Rio Grande do Sul','Rondônia','Roraima','Santa Catarina','São Paulo','Sergipe','Tocantins'];
+ESTADOS.forEach(e => { const o = document.createElement('option'); o.value = o.textContent = e; $('estado').appendChild(o); });
+$('termo').value = ler('termo') || ''; $('estado').value = ler('estado') || '';
+let vagasAtuais = [];
+let buscaAtual = 0;
+
+function badge(nota, completa){
+  if (nota == null) return '<span class="badge b-na">sem currículo</span>';
+  const dica = completa ? 'Aderência ao seu currículo' : 'Prévia: o texto completo da vaga ainda está carregando';
+  return `<span class="badge ${nota>=60?'b-ok':nota>=35?'b-med':'b-bad'}" title="${dica}">${completa ? nota + '%' : '…'}</span>`;
+}
+const textoVaga = (v) => v.completa || v.descricao;
+
+// A busca da Gupy traz só a apresentação da empresa. Requisitos e atividades
+// vêm da página de cada vaga, lida aqui uma por vez (o servidor espaça as consultas).
+async function carregarCompletas(id){
+  const pendentes = vagasAtuais.filter(v => v.url && v.completa == null);
+  let feitas = 0;
+  for (const v of pendentes){
+    if (id !== buscaAtual) return;
+    $('buscaLendo').textContent = `Lendo os requisitos de cada vaga (${++feitas}/${pendentes.length})…`;
+    try{
+      const r = await fetch('/api/vaga?url=' + encodeURIComponent(v.url));
+      const d = await r.json();
+      if (r.ok){ v.completa = d.texto || v.descricao; v.ativa = d.ativa; }
+      else v.completa = v.descricao;
+    }catch{ v.completa = v.descricao; }
+    if (id === buscaAtual) listar();
+  }
+  if (id === buscaAtual) $('buscaLendo').textContent = '';
+}
+function dataBR(s){ if(!s) return ''; const d = new Date(s); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR'); }
+
+function listar(){
+  const cvTexto = $('cv').value.trim();
+  let lista = vagasAtuais.map(v => ({ v, a: cvTexto ? window.Analisador.aderencia(cvTexto, textoVaga(v)) : null }));
+  if ($('soRemoto').checked) lista = lista.filter(x => x.v.modalidade === 'Remoto');
+  if (cvTexto) lista.sort((x, y) => (y.a.nota ?? -1) - (x.a.nota ?? -1));
+  $('listaVagas').innerHTML = lista.map((x, i) => {
+    const v = x.v, local = [v.cidade, v.estado].filter(Boolean).join(' / ');
+    const info = [v.empresa, local, v.modalidade, v.tipo, v.prazo ? 'inscrições até ' + dataBR(v.prazo) : ''].filter(Boolean).map(esc).join(' · ');
+    const falt = x.a && x.a.faltam.length ? '<div class="falt">Requisitos que faltam no currículo: ' + esc(x.a.faltam.slice(0,4).join(', ')) + '</div>' : '';
+    const encerrada = v.ativa === false ? '<div class="falt">Esta vaga não está mais publicada.</div>' : '';
+    return `<article class="vaga">${badge(x.a && x.a.nota, v.completa != null)}<h4>${esc(v.titulo)}</h4><div class="info">${info}</div>${encerrada}${falt}
+      <div class="row"><button data-i="${vagasAtuais.indexOf(v)}" class="primary usar">Analisar com meu currículo</button>
+      ${v.url ? `<a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">Abrir na Gupy ↗</a>` : ''}</div></article>`;
+  }).join('') || '<p class="muted">Nenhuma vaga com esses filtros.</p>';
+  $('listaVagas').querySelectorAll('button.usar').forEach(b => b.onclick = () => {
+    const v = vagasAtuais[Number(b.dataset.i)];
+    $('vaga').value = v.titulo + '\n' + [v.empresa, v.cidade, v.estado, v.modalidade].filter(Boolean).join(' · ') + (v.url ? '\n' + v.url : '') + '\n\n' + textoVaga(v);
+    aba('colar'); analisar();
+  });
+}
+
+$('formBusca').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const termo = $('termo').value.trim(), estado = $('estado').value;
+  if (!termo) return;
+  guardar('termo', termo); guardar('estado', estado);
+  $('outrosSites').innerHTML = 'Também procurar em: ' + window.Analisador.linksBusca(termo, estado).filter(l => l.site !== 'Gupy')
+    .map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.site)}</a>`).join(' · ');
+  if (location.protocol === 'file:'){
+    $('buscaStatus').innerHTML = '<div class="alerta warn">Para buscar vagas, abra o app pelo <b>iniciar.bat</b> (ele liga o servidor local). Aberto direto do arquivo, só a análise funciona.</div>';
+    return;
+  }
+  $('buscaStatus').textContent = 'Buscando na Gupy…'; $('listaVagas').innerHTML = '';
+  try{
+    const resp = await fetch('/api/vagas?termo=' + encodeURIComponent(termo) + (estado ? '&estado=' + encodeURIComponent(estado) : ''));
+    const dados = await resp.json();
+    if (!resp.ok) throw new Error(dados.erro || 'erro ' + resp.status);
+    vagasAtuais = dados.vagas; const id = ++buscaAtual;
+    $('buscaStatus').textContent = dados.vagas.length + ' vagas mais recentes' + (estado ? ' em ' + estado : '') + (dados.cache ? ' (do cache)' : '') + (($('cv').value.trim()) ? ', ordenadas por aderência ao seu currículo.' : '. Preencha o currículo para ordenar por aderência.');
+    listar(); carregarCompletas(id);
+  }catch(err){ $('buscaStatus').innerHTML = '<div class="alerta">' + esc(err.message) + '</div>'; }
+});
+$('soRemoto').addEventListener('change', () => vagasAtuais.length && listar());
+
+// ------------------------------------------------------------ exemplo (dados fictícios)
+$('btnExemplo').onclick = () => {
+  pdfMeta = null; $('cvMeta').textContent = 'Exemplo fictício carregado';
+  $('cv').value = `Ana Souza
+São Paulo - SP | ana.souza@email.com | (11) 91234-5678 | linkedin.com/in/anasouza-exemplo
+Estado civil: solteira
+
+Resumo profissional
+Assistente administrativa com 4 anos em varejo, atendimento e rotinas de estoque. Proativa e dinâmica.
+
+Experiência profissional
+Assistente Administrativo — Loja Exemplo (2022 - atual)
+- Responsável por controle de estoque em Excel.
+- Reduzi em 30% o tempo de fechamento do caixa criando planilha com PROCV e tabela dinâmica.
+- Atendimento ao cliente para cerca de 200 clientes por mês.
+
+Vendedora — Loja Modelo (2020 - 2022)
+- Responsável por vendas e pós-venda.
+- Atingi 115% da meta de vendas em 2021.
+
+Formação
+Tecnólogo em Gestão Comercial — Faculdade Exemplo (2021)
+
+Idiomas
+Inglês intermediário`;
+  $('vaga').value = `Analista Administrativo Pleno
+Empresa Fictícia · São Paulo · Híbrido
+
+Responsabilidades e atribuições
+Controlar estoque e emitir relatórios;
+Elaborar dashboards em Power BI;
+Apoiar o time de compras.
+
+Requisitos e qualificações
+Ensino superior completo em Administração ou áreas afins;
+Excel avançado;
+Experiência com SAP;
+Inglês fluente;
+3 anos de experiência na área.
+
+Diferenciais
+Conhecimento em Python ou SQL;
+Vivência com Lean.
+
+Informações adicionais
+Contratação CLT; vale-refeição; Gympass.`;
+  aba('colar'); analisar();
+};
+
+if (ler('aba') === 'buscar') aba('buscar');
+})();
+</script>
+</body>
+</html>

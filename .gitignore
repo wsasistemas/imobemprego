@@ -1,0 +1,18 @@
+# Segredos
+.env
+.env.*
+!.env.example
+
+# Dependências e builds
+node_modules/
+.vercel/
+
+# Supabase local
+supabase/.temp/
+supabase/.branches/
+
+# Estado de ferramentas do editor/agente
+.omc/
+
+# Guia em PDF de terceiros (cauhi.com): não redistribuir em repositório público
+ai-job-search-pt-br.pdf
