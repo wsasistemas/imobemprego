@@ -32,7 +32,9 @@ for (const f of readdirSync(pasta).filter((n) => n.endsWith('.sql')).sort()) {
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? 'ok    ' : 'FALHA ') + m); if (!c) falhas++; };
 const erro = async (fn) => { try { await fn(); return null; } catch (e) { return e.message; } };
-const cadastrar = (id, meta) => sql(`insert into auth.users (id, raw_user_meta_data) values ($1, $2)`, [id, JSON.stringify(meta)]);
+// Cadastro feito pelo ImobEmpregos (leva a marca app). outroApp: cadastro de outro app do projeto.
+const cadastrar = (id, meta) => sql(`insert into auth.users (id, raw_user_meta_data) values ($1, $2)`, [id, JSON.stringify({ app: 'imobempregos', ...meta })]);
+const outroApp = (id, meta) => sql(`insert into auth.users (id, raw_user_meta_data) values ($1, $2)`, [id, JSON.stringify(meta)]);
 const como = async (papel, uid, fn) => {
   await db.exec(`begin; set local role ${papel}; select set_config('request.jwt.claim.sub', '${uid || ''}', true);`);
   try { return await fn(); } finally { await db.exec('rollback'); }
@@ -121,6 +123,36 @@ ok(!!(await erro(() => sql(`update imobempregos.assinaturas set fatura_url = 'ht
 await sql(`delete from auth.users where id = $1`, [A]);
 ok((await sql(`select count(*)::int n from imobempregos.buscas_salvas`)).rows[0].n === 0, 'apagar conta apaga os dados');
 ok((await sql(`select count(*)::int n from imobempregos.perfis where id = $1`, [A])).rows[0].n === 0, 'apagar conta apaga o perfil');
+
+// ---- projeto compartilhado: cadastros de outros apps não são afetados
+const D = '44444444-4444-4444-4444-444444444444';
+ok(!(await erro(() => outroApp(D, { full_name: 'Dono da Doceria' }))), 'cadastro de outro app (sem WhatsApp) continua funcionando');
+ok((await sql(`select count(*)::int n from imobempregos.perfis where id = $1`, [D])).rows[0].n === 0, '  e não ganha perfil no ImobEmpregos');
+ok((await sql(`select count(*)::int n from imobempregos.assinaturas where usuario_id = $1`, [D])).rows[0].n === 0, '  nem teste grátis');
+ok(!(await erro(() => outroApp(crypto.randomUUID(), { app: 'imobdoces', whatsapp: 'x' }))), 'cadastro marcado com outro app também passa direto');
+
+// ---- quem já tem login de outro app ativa o ImobEmpregos
+await como('authenticated', D, async () => {
+  ok(!!(await erro(() => sql(`select imobempregos.ativar_conta('Dono', '123')`))), 'ativar com WhatsApp inválido é recusado');
+});
+await db.exec(`begin; set local role authenticated; select set_config('request.jwt.claim.sub', '${D}', true);
+  select imobempregos.ativar_conta('  Dono da Doceria ', '(31) 98888-7777'); commit;`);
+const pd = (await sql(`select nome, whatsapp from imobempregos.perfis where id = $1`, [D])).rows[0];
+ok(pd && pd.nome === 'Dono da Doceria' && pd.whatsapp === '5531988887777', 'ativar cria o perfil com WhatsApp normalizado');
+const t1 = (await sql(`select teste_ate from imobempregos.assinaturas where usuario_id = $1`, [D])).rows[0];
+ok(!!t1, 'ativar começa o teste grátis');
+await sql(`update imobempregos.assinaturas set teste_ate = now() - interval '1 day' where usuario_id = $1`, [D]);
+await db.exec(`begin; set local role authenticated; select set_config('request.jwt.claim.sub', '${D}', true);
+  select imobempregos.ativar_conta('Outro Nome', '31977776666'); commit;`);
+const t2 = (await sql(`select teste_ate < now() as vencido from imobempregos.assinaturas where usuario_id = $1`, [D])).rows[0];
+ok(t2.vencido === true, 'ativar de novo não renova o teste grátis');
+ok((await sql(`select nome from imobempregos.perfis where id = $1`, [D])).rows[0].nome === 'Dono da Doceria', '  nem troca o perfil');
+await como('anon', null, async () => {
+  ok(!!(await erro(() => sql(`select imobempregos.ativar_conta('X Y', '31977776666')`))), 'anon não chama ativar_conta');
+});
+await como('authenticated', null, async () => {
+  ok(!!(await erro(() => sql(`select imobempregos.ativar_conta('X Y', '31977776666')`))), 'sem usuário no token, ativar_conta recusa');
+});
 
 console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo.');
 process.exitCode = falhas ? 1 : 0;

@@ -41,6 +41,7 @@ create table imobempregos.eventos_asaas (
 comment on table imobempregos.eventos_asaas is 'Idempotência do webhook do Asaas. Só service_role.';
 
 -- O cadastro passa a criar também a assinatura (começa o teste grátis).
+-- Continua agindo só em cadastros do ImobEmpregos (projeto compartilhado).
 create or replace function imobempregos.criar_perfil_no_cadastro()
 returns trigger
 language plpgsql
@@ -48,6 +49,9 @@ security definer
 set search_path = ''
 as $$
 begin
+  if coalesce(new.raw_user_meta_data ->> 'app', '') <> 'imobempregos' then
+    return new;
+  end if;
   insert into imobempregos.perfis (id, nome, whatsapp)
   values (
     new.id,
@@ -61,6 +65,38 @@ begin
 end;
 $$;
 revoke execute on function imobempregos.criar_perfil_no_cadastro() from public, anon, authenticated;
+
+-- Quem já tem login em outro app do projeto (mesmo auth.users) ativa o
+-- ImobEmpregos informando nome e WhatsApp. Cria o perfil e a assinatura (um
+-- teste grátis por conta: chamar de novo não renova o teste).
+-- SECURITY DEFINER porque o usuário não tem INSERT nessas tabelas; só grava
+-- linhas do próprio auth.uid().
+create function imobempregos.ativar_conta(p_nome text, p_whatsapp text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := (select auth.uid());
+  fone text := regexp_replace(coalesce(p_whatsapp, ''), '[^0-9]', '', 'g');
+begin
+  if uid is null then
+    raise exception 'login necessário' using errcode = '42501';
+  end if;
+  -- Mesma regra do app: DDD + número sem o 55 ganha o 55 na frente.
+  if char_length(fone) in (10, 11) then
+    fone := '55' || fone;
+  end if;
+  insert into imobempregos.perfis (id, nome, whatsapp)
+  values (uid, btrim(p_nome), fone)
+  on conflict (id) do nothing;
+  insert into imobempregos.assinaturas (usuario_id) values (uid)
+  on conflict (usuario_id) do nothing;
+end;
+$$;
+revoke execute on function imobempregos.ativar_conta(text, text) from public, anon;
+grant execute on function imobempregos.ativar_conta(text, text) to authenticated;
 
 -- Contas criadas antes desta migração também ganham o teste.
 insert into imobempregos.assinaturas (usuario_id)

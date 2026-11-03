@@ -5,6 +5,6 @@
 //
 // Onde achar: Supabase > Project Settings > API Keys.
 window.IMOB_CONFIG = {
-  supabaseUrl: '',          // ex.: 'https://abcdefghijklm.supabase.co'
-  supabasePublishableKey: '', // ex.: 'sb_publishable_...'
+  supabaseUrl: 'https://ikvjaowvpvxojvcfwnct.supabase.co',
+  supabasePublishableKey: 'sb_publishable_j4hWbx9_Ovv6q4DgpOJPbQ_3Ar_n3hS',
 };

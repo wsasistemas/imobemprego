@@ -56,11 +56,16 @@ comment on table imobempregos.perfis is 'Um perfil por usuário, criado no cadas
 create trigger perfis_atualizado_em before update on imobempregos.perfis
   for each row execute function imobempregos.tocar_atualizado_em();
 
--- Cria o perfil quando a pessoa se cadastra, com o nome e o WhatsApp enviados
--- no signUp (options.data). Precisa de SECURITY DEFINER porque roda como o papel
--- do Auth, que não tem acesso a este schema. Se nome ou WhatsApp faltarem ou
--- forem inválidos, as restrições da tabela recusam e o cadastro inteiro falha:
--- não existe conta sem perfil completo.
+-- Cria o perfil quando a pessoa se cadastra PELO IMOBEMPREGOS, com o nome e o
+-- WhatsApp enviados no signUp (options.data). Precisa de SECURITY DEFINER porque
+-- roda como o papel do Auth, que não tem acesso a este schema. Se nome ou
+-- WhatsApp faltarem ou forem inválidos, as restrições da tabela recusam e o
+-- cadastro inteiro falha: não existe conta do ImobEmpregos sem perfil completo.
+--
+-- PROJETO COMPARTILHADO: este Supabase atende vários apps (imobdoces, imobrh...)
+-- com o mesmo auth.users. O gatilho roda em TODO cadastro do projeto, então só
+-- age quando o signUp traz app = 'imobempregos'. Cadastros dos outros apps
+-- passam direto, sem perfil aqui e sem erro.
 -- (Os metadados do usuário são editáveis por ele: servem só para preencher o
 -- perfil, nunca para decidir permissões.)
 create function imobempregos.criar_perfil_no_cadastro()
@@ -70,6 +75,9 @@ security definer
 set search_path = ''
 as $$
 begin
+  if coalesce(new.raw_user_meta_data ->> 'app', '') <> 'imobempregos' then
+    return new;
+  end if;
   insert into imobempregos.perfis (id, nome, whatsapp)
   values (
     new.id,

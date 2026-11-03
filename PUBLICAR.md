@@ -23,17 +23,23 @@
 - O Asaas avisa o app de cada pagamento (webhook em `/api/asaas-webhook`). Pagamento confirmado libera o acesso até o vencimento + 1 mês + 3 dias de tolerância. Estorno corta o acesso; cancelamento mantém até o fim do período pago.
 - A regra de acesso fica no banco (`imobempregos.tem_acesso()`). A busca de vagas confere essa regra no servidor a cada pedido.
 
-## 1. Supabase
+## 1. Supabase (projeto compartilhado `ikvjaowvpvxojvcfwnct`)
 
-1. Crie um projeto em [supabase.com](https://supabase.com) (região São Paulo, `sa-east-1`).
-2. Aplique as migrações de `supabase/migrations/`, **em ordem**:
+O ImobEmpregos usa o mesmo projeto Supabase dos outros apps Imob (imobdoces, imobrh, imobinsta…), com o schema próprio `imobempregos`. O **login é compartilhado**: quem já tem conta em outro app entra com a mesma senha e só completa nome e WhatsApp (tela "Complete seu cadastro"; um teste grátis por conta).
+
+Cuidados, porque estas configurações valem para **todos** os apps do projeto:
+- O gatilho de cadastro só age em cadastros feitos pelo ImobEmpregos (marca `app: imobempregos`). Os cadastros dos outros apps não mudam; há teste automático para isso.
+- **Não troque a *Site URL*** nem a senha mínima do projeto. O ImobEmpregos manda o endereço de volta em cada e-mail, e o próprio app exige 8 caracteres na senha.
+- **Modelos de e-mail** (confirmação e nova senha) são os mesmos para todos os apps. Se for editar, use um texto neutro, que sirva para qualquer app Imob.
+
+Passos:
+1. Aplique as migrações de `supabase/migrations/`, **em ordem**:
    - **Pelo painel:** SQL Editor > cole `20261103100327_schema_imobempregos.sql` > Run; depois `20261103110226_assinaturas.sql` > Run.
-   - **Pela CLI:** `npx supabase@2 login`, `npx supabase@2 link --project-ref <ref>`, `npx supabase@2 db push`.
-3. **Settings > Data API > Exposed schemas:** inclua `imobempregos`.
-4. **Authentication > Sign In / Providers > Email:** ligado, com **confirmação de e-mail** e senha mínima de **8** caracteres.
-5. **Authentication > URL Configuration:** *Site URL* = o endereço do site (ex.: `https://imobempregos.pages.dev`). Em *Redirect URLs*, inclua `https://<seu-site>/entrar`.
-6. **Authentication > Emails:** traduza os modelos de confirmação e de recuperação de senha para português.
-7. Copie de **Settings > API Keys**: a URL do projeto, a chave **publishable** e a chave **secret**.
+   - **Pela CLI:** `npx supabase@2 login`, `npx supabase@2 link --project-ref ikvjaowvpvxojvcfwnct`, `npx supabase@2 db push`. Atenção: o `db push` aplica todas as migrações pendentes da pasta; use o painel se o projeto tiver migrações de outros repositórios.
+2. **Settings > Data API > Exposed schemas:** acrescente `imobempregos` à lista que já existe (não remova os outros).
+3. **Authentication > URL Configuration > Redirect URLs:** acrescente `https://<seu-site>/entrar` (sem mexer na *Site URL*).
+4. **Authentication > Sign In / Providers > Email:** confirme que a **confirmação de e-mail** está ligada (já está: conferido em 03/11/2026).
+5. Copie de **Settings > API Keys** a chave **secret** para a Cloudflare (passo 4). A URL e a chave publishable já estão no `config.js`.
 
 ## 2. Asaas
 
@@ -48,14 +54,7 @@
 
 ## 3. Ligar o app ao Supabase
 
-Em `analisador-curriculo/config.js` (pode ir para o GitHub: só a chave publishable):
-
-```js
-window.IMOB_CONFIG = {
-  supabaseUrl: 'https://<ref>.supabase.co',
-  supabasePublishableKey: 'sb_publishable_...',
-};
-```
+Feito: `analisador-curriculo/config.js` já tem a URL do projeto e a chave publishable (pública por natureza; o acesso aos dados é controlado pelo RLS).
 
 ## 4. Cloudflare Pages
 
@@ -68,8 +67,8 @@ window.IMOB_CONFIG = {
 
    | Variável | Valor |
    |---|---|
-   | `SUPABASE_URL` | `https://<ref>.supabase.co` |
-   | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` |
+   | `SUPABASE_URL` | `https://ikvjaowvpvxojvcfwnct.supabase.co` |
+   | `SUPABASE_PUBLISHABLE_KEY` | a mesma do `config.js` |
    | `SUPABASE_SECRET_KEY` | `sb_secret_...` (secret) |
    | `ASAAS_API_KEY` | a chave de API do Asaas (secret) |
    | `ASAAS_AMBIENTE` | `sandbox` no teste, `producao` no lançamento |
@@ -97,7 +96,7 @@ Para rodar as funções como na Cloudflare: `node build.mjs` e depois `npx wrang
 ## Testes
 
 - App e servidor: `cd analisador-curriculo && node --test teste.mjs teste-servidor.mjs` (32 testes: análise, Gupy, Vigia, cadastro, acesso, assinar com Pix e cartão, cancelar e os avisos do Asaas, com Supabase e Asaas simulados).
-- Banco: `cd supabase/tests && npm install && npm test` (44 verificações: cadastro, RLS, teste grátis de 10 dias, regra de acesso, ninguém consegue se dar acesso).
+- Banco: `cd supabase/tests && npm install && npm test` (55 verificações: cadastro, RLS, teste grátis de 10 dias, regra de acesso, ninguém consegue se dar acesso, cadastros dos outros apps intactos e ativação de quem já tem login Imob).
 
 ## Antes de divulgar
 

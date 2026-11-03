@@ -73,8 +73,8 @@
     const M = {
       invalid_credentials: 'E-mail ou senha incorretos.',
       email_not_confirmed: 'Confirme seu e-mail pelo link que enviamos antes de entrar.',
-      user_already_exists: 'Este e-mail já tem conta. Entre ou use "Esqueci minha senha".',
-      email_exists: 'Este e-mail já tem conta. Entre ou use "Esqueci minha senha".',
+      user_already_exists: 'Este e-mail já tem conta (vale também para os outros apps Imob). Entre com a mesma senha ou use "Esqueci minha senha".',
+      email_exists: 'Este e-mail já tem conta (vale também para os outros apps Imob). Entre com a mesma senha ou use "Esqueci minha senha".',
       weak_password: 'Senha fraca. Use pelo menos 8 caracteres, misturando letras e números.',
       over_request_rate_limit: 'Muitas tentativas. Espere alguns minutos e tente de novo.',
       over_email_send_rate_limit: 'Muitos e-mails enviados. Espere alguns minutos e tente de novo.',

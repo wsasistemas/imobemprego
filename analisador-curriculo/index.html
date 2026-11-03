@@ -198,6 +198,9 @@ footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
   acesso.then(async function(r){
     liberar();
     if (r.modoLocal){ sub.textContent = 'Modo local, sem login (config.js vazio)'; return; }
+    // Login de outro app Imob sem perfil aqui: completa o cadastro primeiro.
+    const p = await window.ImobAuth.perfil();
+    if (!p){ location.replace('entrar.html'); return; }
     // Teste grátis ou mensalidade em dia? Senão, vai assinar.
     const s = window.Validacao.situacaoAssinatura(await window.ImobAuth.assinatura().catch(function(){ return null; }));
     if (!s.acesso){ location.replace('assinatura.html'); return; }
@@ -209,8 +212,7 @@ footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
     link.textContent = s.tipo === 'teste' || s.tipo === 'cancelada' ? 'Assinar' : 'Minha assinatura';
     link.style.color = 'var(--accent)';
     sub.appendChild(link);
-    const p = await window.ImobAuth.perfil();
-    if (p && p.nome){ ola.textContent = 'Olá, ' + p.nome.split(' ')[0]; }
+    if (p.nome){ ola.textContent = 'Olá, ' + p.nome.split(' ')[0]; }
   }).catch(function(){
     liberar();
     document.querySelector('.wrap').innerHTML = '<p class="alerta">Não foi possível carregar o login. Verifique a internet e recarregue a página.</p>';

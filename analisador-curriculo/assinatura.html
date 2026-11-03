@@ -204,6 +204,7 @@ input[aria-invalid=true]{border-color:var(--bad)}
     return;
   }
   A.exigirLogin().then(async () => {
+    if (!(await A.perfil())) return location.replace('entrar.html'); // login de outro app: completar cadastro
     const s = await carregar();
     if (retorno === 'ok' && s && s.tipo !== 'ativa') aguardarConfirmacao();
     else if (retorno === 'cancelado' || retorno === 'expirado') $('aviso').textContent = 'O pagamento não foi concluído. Você pode tentar de novo.';

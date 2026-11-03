@@ -215,6 +215,37 @@ input[aria-invalid=true]{border-color:var(--bad)}
   </form>
 </main>
 
+<!-- ============================ COMPLETAR (login de outro app Imob) ============================ -->
+<main class="tela" id="v-completar" hidden>
+  <div class="hero baixo">
+    <img src="img/cadastro.jpg" alt="" width="800" height="400">
+    <div class="chamada"><p class="kicker">Falta pouco</p><h1>Complete seu cadastro</h1></div>
+  </div>
+  <form id="f-completar" novalidate>
+    <p class="ajuda" style="font-size:14px;color:var(--soft)">Você já tem login em outro app da Imob. Para usar o ImobEmpregos, confirme seu nome e WhatsApp. Seus 10 dias grátis começam agora.</p>
+    <div class="aviso" id="a-completar" role="alert"></div>
+    <div class="campo">
+      <label for="p-nome">Nome completo</label>
+      <input id="p-nome" type="text" autocomplete="name" placeholder="Como no seu currículo" maxlength="120" aria-describedby="y-nome" required>
+      <p class="erro-campo" id="y-nome"></p>
+    </div>
+    <div class="campo">
+      <label for="p-whats">WhatsApp</label>
+      <div class="fone" id="p-fone">
+        <span><svg width="16" height="16" aria-hidden="true" style="color:var(--gold)"><use href="#i-fone"/></svg>+55</span>
+        <input id="p-whats" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 91234-5678" aria-describedby="y-whatsapp" required>
+      </div>
+      <p class="erro-campo" id="y-whatsapp"></p>
+    </div>
+    <div>
+      <label class="termos"><input id="p-termos" type="checkbox" aria-describedby="y-termos"><span>Li e aceito os <a href="termos.html" target="_blank" rel="noopener">termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">política de privacidade</a>.</span></label>
+      <p class="erro-campo" id="y-termos"></p>
+    </div>
+    <button class="btn ouro" type="submit">Começar a usar</button>
+  </form>
+  <p class="centro"><button type="button" class="linkbtn" id="sairCompletar">Usar outra conta</button></p>
+</main>
+
 <!-- ============================ CONFIRME O E-MAIL ============================ -->
 <main class="tela" id="v-confirme" hidden>
   <div class="hero baixo">
@@ -237,12 +268,12 @@ input[aria-invalid=true]{border-color:var(--bad)}
   'use strict';
   const $ = (id) => document.getElementById(id);
   const V = window.Validacao, A = window.ImobAuth;
-  const VIEWS = ['entrar', 'cadastro', 'esqueci', 'nova', 'confirme'];
+  const VIEWS = ['entrar', 'cadastro', 'esqueci', 'nova', 'confirme', 'completar'];
   const voltarPara = 'index.html';
 
   function mostrar(nome, foco) {
     VIEWS.forEach((v) => { $('v-' + v).hidden = v !== nome; });
-    document.title = ({ entrar: 'Entrar', cadastro: 'Criar conta', esqueci: 'Recuperar senha', nova: 'Nova senha', confirme: 'Confirme seu e-mail' })[nome] + ' · ImobEmpregos';
+    document.title = ({ entrar: 'Entrar', cadastro: 'Criar conta', esqueci: 'Recuperar senha', nova: 'Nova senha', confirme: 'Confirme seu e-mail', completar: 'Complete seu cadastro' })[nome] + ' · ImobEmpregos';
     window.scrollTo(0, 0);
     const alvo = foco && $(foco);
     if (alvo) setTimeout(() => alvo.focus(), 50);
@@ -264,7 +295,7 @@ input[aria-invalid=true]{border-color:var(--bad)}
   }));
 
   // Máscara do WhatsApp
-  $('c-whats').addEventListener('input', (e) => { e.target.value = V.mascararWhatsapp(e.target.value); });
+  ['c-whats', 'p-whats'].forEach((id) => $(id).addEventListener('input', (e) => { e.target.value = V.mascararWhatsapp(e.target.value); }));
 
   function aviso(id, texto, tipo) { const el = $(id); el.className = 'aviso ' + (tipo || 'erro'); el.textContent = texto || ''; }
   function ocupado(form, sim) { const b = form.querySelector('[type=submit]'); b.disabled = sim; b.dataset.rotulo = b.dataset.rotulo || b.textContent; b.textContent = sim ? 'Aguarde…' : b.dataset.rotulo; }
@@ -299,8 +330,16 @@ input[aria-invalid=true]{border-color:var(--bad)}
   if (recuperando) mostrar('nova', 'n-senha');
   else if (location.hash === '#cadastro') mostrar('cadastro');
 
-  // Já logado? Vai direto para o app.
-  A.sessao().then((s) => { if (s && !recuperando) location.replace(voltarPara); });
+  // Logado: tem perfil no ImobEmpregos? Quem veio de outro app Imob (mesmo
+  // login) ainda não tem, e completa nome e WhatsApp antes de entrar.
+  async function seguirLogado() {
+    const p = await A.perfil();
+    if (p) return location.replace(voltarPara);
+    mostrar('completar', 'p-nome');
+  }
+
+  // Já logado? Vai direto para o app (ou completa o cadastro).
+  A.sessao().then((s) => { if (s && !recuperando) seguirLogado(); });
 
   // ---------- entrar
   $('f-entrar').addEventListener('submit', async (e) => {
@@ -311,6 +350,29 @@ input[aria-invalid=true]{border-color:var(--bad)}
     const { error } = await c.auth.signInWithPassword({ email, password: senha });
     ocupado(e.target, false);
     if (error) return aviso('a-entrar', V.mensagemErroAuth(error));
+    seguirLogado();
+  });
+
+  // ---------- completar cadastro (login de outro app Imob)
+  $('sairCompletar').addEventListener('click', async () => { await c.auth.signOut(); mostrar('entrar', 'e-email'); });
+  $('f-completar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    // Reaproveita a validação do cadastro; e-mail e senha já existem.
+    const r = V.validarCadastro({ nome: $('p-nome').value, whatsapp: $('p-whats').value, email: 'ok@ok.com', senha: '12345678', termos: $('p-termos').checked });
+    const CAMPOS_P = { nome: 'p-nome', whatsapp: 'p-whats', termos: 'p-termos' };
+    let primeiro = null;
+    Object.keys(CAMPOS_P).forEach((k) => {
+      const msg = r.erros[k] || '';
+      $('y-' + k).textContent = msg;
+      $(CAMPOS_P[k]).setAttribute('aria-invalid', msg ? 'true' : 'false');
+      if (k === 'whatsapp') $('p-fone').classList.toggle('erro', !!msg);
+      if (msg && !primeiro) primeiro = CAMPOS_P[k];
+    });
+    if (primeiro) return $(primeiro).focus();
+    aviso('a-completar', ''); ocupado(e.target, true);
+    const { error } = await c.schema('imobempregos').rpc('ativar_conta', { p_nome: r.dados.nome, p_whatsapp: r.dados.whatsapp });
+    ocupado(e.target, false);
+    if (error) return aviso('a-completar', 'Não foi possível ativar sua conta. Confira nome e WhatsApp e tente de novo.');
     location.replace(voltarPara);
   });
 
@@ -333,7 +395,9 @@ input[aria-invalid=true]{border-color:var(--bad)}
       email: r.dados.email,
       password: r.dados.senha,
       options: {
-        data: { nome: r.dados.nome, whatsapp: r.dados.whatsapp },
+        // "app" marca o cadastro como do ImobEmpregos: o projeto Supabase é
+        // compartilhado com outros apps, e só cadastros com essa marca criam perfil aqui.
+        data: { app: 'imobempregos', nome: r.dados.nome, whatsapp: r.dados.whatsapp },
         emailRedirectTo: location.origin + location.pathname,
       },
     });
