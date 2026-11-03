@@ -16,3 +16,6 @@ supabase/.branches/
 
 # Guia em PDF de terceiros (cauhi.com): não redistribuir em repositório público
 ai-job-search-pt-br.pdf
+
+# Playwright (testes no navegador)
+.playwright-mcp/

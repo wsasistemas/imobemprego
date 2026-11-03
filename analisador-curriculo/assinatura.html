@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Assinatura · ImobEmpregos</title>
+<meta name="theme-color" content="#0e1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#0e1220; --surface:#171d31; --surface2:#1f2740; --line:rgba(255,255,255,.12); --divider:rgba(255,255,255,.09);
+  --text:#f5f2ee; --muted:#8d95ad; --soft:#d9dce6; --gold:#e3a63c; --gold-soft:#f0c887; --on-gold:#20160a;
+  --bad:#f87171; --bad-soft:#3a1a1a; --ok:#4ade80; --ok-soft:#173022;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Archivo,ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--gold-soft);font-weight:600;text-decoration:none}a:hover{color:var(--gold)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.tela{max-width:480px;min-height:100vh;min-height:100dvh;margin:0 auto;padding:0 16px calc(32px + env(safe-area-inset-bottom))}
+.topo{height:64px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.07);margin:0 -16px;padding:0 16px;padding-top:env(safe-area-inset-top);box-sizing:content-box}
+.icone-btn{width:44px;height:44px;flex:none;border-radius:12px;border:1px solid rgba(255,255,255,.07);background:var(--surface);color:var(--text);display:grid;place-items:center;cursor:pointer;padding:0}
+.topo b{flex:1;font-size:16px;letter-spacing:-.4px}
+.sair{background:none;border:0;color:var(--muted);font:inherit;font-weight:600;cursor:pointer;min-height:44px;padding:0 4px}
+.kicker{margin:0;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--gold)}
+h1{margin:4px 0 0;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.6px}
+h1 small{font-size:16px;font-weight:600;color:var(--muted);letter-spacing:0}
+.cartao{margin-top:14px;padding:16px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:var(--surface)}
+.beneficios{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.beneficios li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--soft)}
+.beneficios svg{flex:none;margin-top:2px;color:var(--gold)}
+.situacao{margin-top:14px;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45;border:1px solid var(--line);background:var(--surface);color:var(--soft)}
+.situacao.ok{background:var(--ok-soft);border-color:transparent;color:#bbf7d0}
+.situacao.alerta{background:var(--bad-soft);border-color:transparent;color:#fecaca}
+.situacao.ouro{background:rgba(227,166,60,.12);border-color:rgba(227,166,60,.35);color:var(--gold-soft)}
+form{display:flex;flex-direction:column;gap:14px;margin-top:18px}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:10px}
+legend{font-size:13px;font-weight:600;margin-bottom:8px;padding:0}
+.opcao{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.opcao:has(input:checked){border-color:var(--gold);background:rgba(227,166,60,.08)}
+.opcao input{width:20px;height:20px;margin:2px 0 0;flex:none;accent-color:var(--gold)}
+.opcao b{display:block;font-size:15px}
+.opcao span{display:block;font-size:13px;color:var(--muted)}
+.campo{display:flex;flex-direction:column;gap:6px}
+label.rot{font-size:13px;font-weight:600}
+input[type=text]{width:100%;height:48px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;font-size:16px}
+input::placeholder{color:var(--muted)}
+input[aria-invalid=true]{border-color:var(--bad)}
+.ajuda{margin:0;font-size:12px;color:var(--muted)}
+.erro-campo{margin:0;font-size:12.5px;color:var(--bad)}.erro-campo:empty{display:none}
+.btn{min-height:48px;border-radius:10px;font:inherit;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;width:100%;text-decoration:none;padding:0 16px}
+.btn.ouro{background:var(--gold);color:var(--on-gold);border:0}.btn.ouro:hover{opacity:.92;color:var(--on-gold)}
+.btn.contorno{background:transparent;border:1px solid rgba(227,166,60,.6);color:var(--gold-soft)}
+.btn.discreto{background:transparent;border:1px solid var(--line);color:var(--soft)}
+.btn[disabled]{opacity:.55;cursor:wait}
+.aviso{border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.45;background:var(--bad-soft);color:#fecaca}.aviso:empty{display:none}
+.rodape{margin-top:18px;font-size:12px;line-height:1.5;color:var(--muted)}
+.acoes{display:grid;gap:10px;margin-top:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-voltar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-externo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3"/></symbol>
+</svg>
+
+<main class="tela">
+  <div class="topo">
+    <a class="icone-btn" href="index.html" id="voltar" aria-label="Voltar para o app" hidden><svg width="20" height="20" aria-hidden="true"><use href="#i-voltar"/></svg></a>
+    <b>Assinatura</b>
+    <button type="button" class="sair" id="btnSair">Sair</button>
+  </div>
+
+  <section class="cartao" aria-labelledby="t-plano" style="margin-top:16px">
+    <p class="kicker">Plano ImobEmpregos</p>
+    <h1 id="t-plano">R$ 10 <small>por mês</small></h1>
+    <ul class="beneficios">
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Vagas novas da Gupy ordenadas pelo seu currículo</li>
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Análise do currículo para cada vaga, no seu celular</li>
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Sem fidelidade: cancele quando quiser, aqui mesmo</li>
+      <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>10 dias grátis, sem cartão</li>
+    </ul>
+  </section>
+
+  <div class="situacao" id="situacao" role="status">Carregando sua assinatura…</div>
+
+  <div class="acoes" id="pagarPix" hidden>
+    <a class="btn ouro" id="linkPix" href="#" target="_blank" rel="noopener">Pagar o Pix de R$ 10 <svg width="16" height="16" aria-hidden="true"><use href="#i-externo"/></svg></a>
+    <p class="ajuda">Abre a cobrança do Asaas com o QR Code e o código copia e cola.</p>
+  </div>
+
+  <form id="fAssinar" novalidate hidden>
+    <div class="aviso" id="aviso" role="alert"></div>
+    <fieldset>
+      <legend>Como você prefere pagar?</legend>
+      <label class="opcao"><input type="radio" name="forma" value="CREDIT_CARD" checked><div><b>Cartão de crédito</b><span>Renova sozinho todo mês. Você digita o cartão na página segura do Asaas.</span></div></label>
+      <label class="opcao"><input type="radio" name="forma" value="PIX"><div><b>Pix</b><span>Uma cobrança por mês. Você paga pelo app do banco.</span></div></label>
+    </fieldset>
+    <div class="campo">
+      <label class="rot" for="cpf">CPF de quem paga</label>
+      <input id="cpf" type="text" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" aria-describedby="cpf-ajuda x-cpf">
+      <p class="ajuda" id="cpf-ajuda">Exigido pelo Asaas para emitir a cobrança. Vai direto para o Asaas; não guardamos seu CPF.</p>
+      <p class="erro-campo" id="x-cpf"></p>
+    </div>
+    <p class="ajuda" id="quandoCobra"></p>
+    <button class="btn ouro" type="submit">Assinar por R$ 10/mês</button>
+  </form>
+
+  <div class="acoes" id="areaCancelar" hidden>
+    <button type="button" class="btn discreto" id="btnCancelar">Cancelar assinatura</button>
+  </div>
+
+  <a class="btn contorno" href="index.html" id="irApp" hidden style="margin-top:14px">Ir para o app</a>
+
+  <p class="rodape">Pagamento processado pelo Asaas. Sem fidelidade e sem multa: ao cancelar, você continua usando até o fim do período pago. Dúvidas: veja os <a href="termos.html">termos de uso</a> e a <a href="privacidade.html">política de privacidade</a>.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="validacao.js"></script>
+<script src="auth.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const V = window.Validacao, A = window.ImobAuth;
+  const retorno = new URLSearchParams(location.search).get('r');
+
+  $('cpf').addEventListener('input', (e) => { e.target.value = V.mascararCpf(e.target.value); });
+  $('btnSair').onclick = () => A.sair();
+
+  function mostrar(a) {
+    const s = V.situacaoAssinatura(a);
+    const caixa = $('situacao');
+    caixa.textContent = s.texto;
+    caixa.className = 'situacao ' + ({ ativa: 'ok', cancelada: '', teste: 'ouro', atrasada: 'alerta', bloqueado: 'alerta', sem: 'alerta' })[s.tipo];
+    $('voltar').hidden = !s.acesso;
+    $('irApp').hidden = !s.acesso;
+
+    const pixAberto = a && a.forma === 'PIX' && a.asaas_assinatura_id && a.status !== 'cancelada';
+    const assinou = a && (a.status === 'ativa' || pixAberto);
+    $('fAssinar').hidden = !a || assinou;
+    $('areaCancelar').hidden = !assinou;
+    const pagarPix = pixAberto && a.fatura_url && !(a.status === 'ativa' && a.acesso_ate && new Date(a.acesso_ate) > new Date());
+    $('pagarPix').hidden = !pagarPix;
+    if (pagarPix) $('linkPix').href = a.fatura_url;
+    $('quandoCobra').textContent = s.diasTeste ? 'A primeira mensalidade só vence em ' + s.fimTeste + ', quando o teste grátis acaba.' : 'A primeira mensalidade vence hoje.';
+    return s;
+  }
+
+  async function carregar() {
+    try { return mostrar(await A.assinatura()); }
+    catch (e) { $('situacao').textContent = e.message; $('situacao').className = 'situacao alerta'; return null; }
+  }
+
+  // Voltou do pagamento: a confirmação chega pelo Asaas em alguns segundos.
+  async function aguardarConfirmacao() {
+    $('situacao').textContent = 'Recebemos seu pagamento no Asaas. Confirmando…';
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const a = await A.assinatura().catch(() => null);
+      if (a && (a.status === 'ativa' || a.fatura_url)) { history.replaceState(null, '', location.pathname); return mostrar(a); }
+    }
+    $('situacao').textContent = 'O Asaas ainda não confirmou. Pix e cartão costumam confirmar em minutos; volte aqui mais tarde.';
+  }
+
+  $('fAssinar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cpf = V.normalizarCpf($('cpf').value);
+    $('x-cpf').textContent = cpf ? '' : 'CPF inválido. Confira os números.';
+    $('cpf').setAttribute('aria-invalid', cpf ? 'false' : 'true');
+    if (!cpf) return $('cpf').focus();
+    const forma = new FormData(e.target).get('forma');
+    const botao = e.target.querySelector('[type=submit]');
+    botao.disabled = true; botao.textContent = 'Abrindo o pagamento…'; $('aviso').textContent = '';
+    try {
+      const { url } = await A.postApi('/api/assinar', { forma, cpf });
+      if (!/^https:\/\/([a-z0-9-]+\.)?asaas\.com\//.test(url)) throw new Error('Link de pagamento inesperado.');
+      location.href = url;
+    } catch (err) {
+      $('aviso').textContent = err.message;
+      botao.disabled = false; botao.textContent = 'Assinar por R$ 10/mês';
+    }
+  });
+
+  $('btnCancelar').addEventListener('click', async () => {
+    if (!confirm('Cancelar a assinatura? Você continua usando até o fim do período já pago e não será cobrado de novo.')) return;
+    const b = $('btnCancelar'); b.disabled = true; b.textContent = 'Cancelando…';
+    try { await A.postApi('/api/cancelar'); await carregar(); }
+    catch (err) { alert(err.message); }
+    finally { b.disabled = false; b.textContent = 'Cancelar assinatura'; }
+  });
+
+  if (!A.configurado) {
+    $('situacao').textContent = 'Assinatura indisponível: o app ainda não foi configurado (config.js).';
+    $('btnSair').hidden = true;
+    return;
+  }
+  A.exigirLogin().then(async () => {
+    const s = await carregar();
+    if (retorno === 'ok' && s && s.tipo !== 'ativa') aguardarConfirmacao();
+    else if (retorno === 'cancelado' || retorno === 'expirado') $('aviso').textContent = 'O pagamento não foi concluído. Você pode tentar de novo.';
+  });
+})();
+</script>
+</body>
+</html>

@@ -2,24 +2,35 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Analisador de Currículo</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230f766e'/><path d='M9 8h10l4 4v12H9z' fill='white'/><path d='M12 15h8M12 19h6' stroke='%230f766e' stroke-width='2'/></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ImobEmpregos</title>
+<meta name="theme-color" content="#0e1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap">
 <style>
+/* Paleta "ateliê" (mesma do app da ImobDoces): tema escuro fixo, acento dourado. */
 :root{
-  --bg:#f6f7f5; --card:#ffffff; --ink:#1c2321; --muted:#5d6865; --line:#e2e6e3;
-  --accent:#0f766e; --accent-ink:#ffffff; --accent-soft:#e3f2ef;
-  --ok:#15803d; --ok-soft:#e7f5ec; --warn:#b45309; --warn-soft:#fdf1e2; --bad:#b91c1c; --bad-soft:#fbe9e9;
-  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#111514; --card:#1a201e; --ink:#e7ecea; --muted:#9aa6a2; --line:#2b3330;
-  --accent:#2dd4bf; --accent-ink:#06201d; --accent-soft:#16322e;
-  --ok:#4ade80; --ok-soft:#173022; --warn:#fbbf24; --warn-soft:#33270f; --bad:#f87171; --bad-soft:#3a1a1a;
+  --bg:#0e1220; --card:#171d31; --ink:#f5f2ee; --muted:#8d95ad; --line:rgba(255,255,255,.1);
+  --accent:#e3a63c; --accent-ink:#20160a; --accent-soft:rgba(227,166,60,.14);
+  --ok:#4ade80; --ok-soft:#173022; --warn:#f0c887; --warn-soft:#33270f; --bad:#f87171; --bad-soft:#3a1a1a;
   --shadow:none;
-}}
+  color-scheme: dark;
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Archivo,ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body.verificando .wrap{visibility:hidden}
+[hidden]{display:none!important}
+.appbar{display:flex;align-items:center;gap:12px;padding:12px 0 16px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.appbar .tile{width:40px;height:40px;flex:none;border:1px solid rgba(227,166,60,.7);border-radius:12px;color:var(--accent);display:grid;place-items:center}
+.appbar .quem{flex:1;min-width:0}
+.appbar .quem b{display:block;font-size:16px;letter-spacing:-.4px}
+.appbar .quem small{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar button{min-height:44px}
+.kicker{margin:0;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
 .wrap{max-width:1120px;margin:0 auto;padding:24px 16px 64px}
 header h1{margin:0;font-size:26px;letter-spacing:-.01em}
 header p{margin:4px 0 0;color:var(--muted)}
@@ -93,12 +104,18 @@ footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 </head>
-<body>
+<body class="verificando">
 <div class="wrap">
+  <div class="appbar">
+    <span class="tile"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></span>
+    <div class="quem"><b id="ola">ImobEmpregos</b><small id="quemSub">Vagas, currículo e candidatura</small></div>
+    <button type="button" id="btnSair" hidden>Sair</button>
+  </div>
   <header>
-    <h1>Analisador de Currículo</h1>
+    <p class="kicker">Analisador de currículo</p>
+    <h1>Seu currículo contra a vaga</h1>
     <p>Compare seu currículo com uma vaga, veja como um sistema de triagem (ATS) lê o arquivo e busque vagas na Gupy.</p>
-    <span class="priv">🔒 A análise roda no seu computador. O currículo não é enviado a nenhum servidor.</span>
+    <span class="priv">A análise roda no seu aparelho. O currículo não é enviado a nenhum servidor.</span>
   </header>
 
   <div class="grid2">
@@ -166,6 +183,40 @@ footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="validacao.js"></script>
+<script src="auth.js"></script>
+<script>
+// Só mostra o app para quem está logado (em localhost sem config.js, abre em "modo local").
+(function(){
+  const sub = document.getElementById('quemSub'), ola = document.getElementById('ola'), sair = document.getElementById('btnSair');
+  function liberar(){ document.body.classList.remove('verificando'); }
+  let acesso;
+  try { acesso = window.ImobAuth.exigirLogin(); }
+  catch (e) { acesso = Promise.reject(e); }
+  acesso.then(async function(r){
+    liberar();
+    if (r.modoLocal){ sub.textContent = 'Modo local, sem login (config.js vazio)'; return; }
+    // Teste grátis ou mensalidade em dia? Senão, vai assinar.
+    const s = window.Validacao.situacaoAssinatura(await window.ImobAuth.assinatura().catch(function(){ return null; }));
+    if (!s.acesso){ location.replace('assinatura.html'); return; }
+    sair.hidden = false;
+    sair.onclick = function(){ window.ImobAuth.sair(); };
+    sub.textContent = s.texto + ' ';
+    const link = document.createElement('a');
+    link.href = 'assinatura.html';
+    link.textContent = s.tipo === 'teste' || s.tipo === 'cancelada' ? 'Assinar' : 'Minha assinatura';
+    link.style.color = 'var(--accent)';
+    sub.appendChild(link);
+    const p = await window.ImobAuth.perfil();
+    if (p && p.nome){ ola.textContent = 'Olá, ' + p.nome.split(' ')[0]; }
+  }).catch(function(){
+    liberar();
+    document.querySelector('.wrap').innerHTML = '<p class="alerta">Não foi possível carregar o login. Verifique a internet e recarregue a página.</p>';
+  });
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="analisador.js"></script>
 <script>
@@ -371,7 +422,7 @@ async function carregarCompletas(id){
     if (id !== buscaAtual) return;
     $('buscaLendo').textContent = `Lendo os requisitos de cada vaga (${++feitas}/${pendentes.length})…`;
     try{
-      const r = await fetch('/api/vaga?url=' + encodeURIComponent(v.url));
+      const r = await window.ImobAuth.fetchApi('/api/vaga?url=' + encodeURIComponent(v.url));
       const d = await r.json();
       if (r.ok){ v.completa = d.texto || v.descricao; v.ativa = d.ativa; }
       else v.completa = v.descricao;
@@ -416,7 +467,7 @@ $('formBusca').addEventListener('submit', async (e) => {
   }
   $('buscaStatus').textContent = 'Buscando na Gupy…'; $('listaVagas').innerHTML = '';
   try{
-    const resp = await fetch('/api/vagas?termo=' + encodeURIComponent(termo) + (estado ? '&estado=' + encodeURIComponent(estado) : ''));
+    const resp = await window.ImobAuth.fetchApi('/api/vagas?termo=' + encodeURIComponent(termo) + (estado ? '&estado=' + encodeURIComponent(estado) : ''));
     const dados = await resp.json();
     if (!resp.ok) throw new Error(dados.erro || 'erro ' + resp.status);
     vagasAtuais = dados.vagas; const id = ++buscaAtual;

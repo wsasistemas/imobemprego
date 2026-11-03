@@ -1,0 +1,245 @@
+// Testes das funções do site (assinatura, Asaas, acesso). Sem rede: Supabase e
+// Asaas são simulados por um fetch falso.
+//   node --test teste.mjs teste-servidor.mjs
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { exigirAcesso } from './lib/servidor/comum.mjs';
+import {
+  processarEvento, acessoAteParaVencimento, primeiroVencimento, filtroDasChaves, tokenConfere, PRECO,
+} from './lib/servidor/asaas.mjs';
+import { assinar, cancelar, webhookAsaas } from './lib/servidor/acoes.mjs';
+
+const V = createRequire(import.meta.url)('./validacao.js');
+
+const ENV = {
+  SUPABASE_URL: 'https://abc.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_teste',
+  SUPABASE_SECRET_KEY: 'sb_secret_teste',
+  ASAAS_API_KEY: '$aact_teste',
+  ASAAS_AMBIENTE: 'sandbox',
+  ASAAS_WEBHOOK_TOKEN: 'w'.repeat(40),
+  SITE_URL: 'https://imobempregos.pages.dev',
+};
+const UID = '11111111-1111-1111-1111-111111111111';
+const CPF = '529.982.247-25';
+
+/** fetch falso: rotas [regex, método, resposta | (url, corpo) => resposta]; guarda as chamadas. */
+function fetchFalso(rotas) {
+  const chamadas = [];
+  const f = async (url, opts = {}) => {
+    const metodo = opts.method || 'GET';
+    const corpo = opts.body ? JSON.parse(opts.body) : undefined;
+    chamadas.push({ url: String(url), metodo, corpo, headers: opts.headers || {} });
+    for (const [re, m, resp] of rotas) {
+      if (m === metodo && re.test(String(url))) {
+        const r = typeof resp === 'function' ? resp(String(url), corpo) : resp;
+        return new Response(r.body === undefined ? '' : JSON.stringify(r.body), { status: r.status || 200 });
+      }
+    }
+    throw new Error('rota não prevista: ' + metodo + ' ' + url);
+  };
+  f.chamadas = chamadas;
+  f.de = (re, metodo) => chamadas.filter((c) => re.test(c.url) && (!metodo || c.metodo === metodo));
+  return f;
+}
+
+const comToken = (url, init = {}) => new Request(url, { ...init, headers: { Authorization: 'Bearer tok.en', ...(init.headers || {}) } });
+const usuario = [/\/auth\/v1\/user$/, 'GET', { body: { id: UID, email: 'ana@exemplo.com', user_metadata: { nome: 'Ana Souza' } } }];
+const linha = (extra) => ({ usuario_id: UID, status: 'teste', teste_ate: '2099-01-10T12:00:00Z', acesso_ate: null, forma: null, asaas_cliente_id: null, asaas_assinatura_id: null, fatura_url: null, ...extra });
+
+// ------------------------------------------------------------------ regras puras
+
+test('CPF: dígitos verificadores e máscara', () => {
+  assert.equal(V.normalizarCpf(CPF), '52998224725');
+  assert.equal(V.normalizarCpf('529.982.247-24'), null);
+  assert.equal(V.normalizarCpf('111.111.111-11'), null);
+  assert.equal(V.mascararCpf('52998224725'), '529.982.247-25');
+});
+
+test('situação da assinatura: o que a tela mostra', () => {
+  const agora = new Date('2026-11-05T12:00:00Z');
+  const s = (a) => V.situacaoAssinatura(a, agora);
+  assert.deepEqual([s(linha({ teste_ate: '2026-11-13T12:00:00Z' })).tipo, s(linha({ teste_ate: '2026-11-13T12:00:00Z' })).diasTeste], ['teste', 8]);
+  assert.equal(s(linha({ teste_ate: '2026-11-04T12:00:00Z' })).tipo, 'bloqueado');
+  assert.equal(s(linha({ teste_ate: '2026-11-04T12:00:00Z' })).acesso, false);
+  assert.equal(s(linha({ status: 'ativa', teste_ate: '2026-11-01T00:00:00Z', acesso_ate: '2026-12-10T00:00:00Z' })).tipo, 'ativa');
+  assert.equal(s(linha({ status: 'ativa', teste_ate: '2026-11-13T00:00:00Z' })).acesso, true, 'cartão cadastrado no teste');
+  const canc = s(linha({ status: 'cancelada', teste_ate: '2026-11-01T00:00:00Z', acesso_ate: '2026-11-20T00:00:00Z' }));
+  assert.equal(canc.tipo, 'cancelada');
+  assert.equal(canc.acesso, true, 'cancelou: usa até o fim do pago');
+  assert.equal(s(linha({ status: 'atrasada', teste_ate: '2026-11-01T00:00:00Z' })).acesso, false);
+  assert.equal(s(null).acesso, false);
+});
+
+test('datas: acesso até vencimento + 1 mês + 3 dias; primeiro vencimento no fim do teste', () => {
+  assert.equal(acessoAteParaVencimento('2026-11-10'), '2026-12-13T23:59:59.000Z');
+  assert.equal(acessoAteParaVencimento('2027-01-31'), '2027-03-03T23:59:59.000Z', '31/01 -> fim de fevereiro + 3');
+  assert.equal(acessoAteParaVencimento('lixo'), null);
+  const agora = new Date('2026-11-05T15:00:00Z');
+  assert.equal(primeiroVencimento('2026-11-15T12:00:00Z', agora), '2026-11-15', 'no teste: vence quando o teste acaba');
+  assert.equal(primeiroVencimento('2026-11-01T12:00:00Z', agora), '2026-11-05', 'teste acabou: vence hoje');
+  assert.equal(primeiroVencimento('2026-11-06T01:00:00Z', agora), '2026-11-05', 'fuso de Brasília');
+});
+
+test('webhook: cada evento vira a mudança certa', () => {
+  const agora = new Date('2026-11-05T12:00:00Z');
+  const pago = processarEvento({ event: 'PAYMENT_CONFIRMED', payment: { customer: 'cus_1', subscription: 'sub_1', billingType: 'PIX', dueDate: '2026-11-10' } }, agora);
+  assert.deepEqual(pago.chaves, { assinatura: 'sub_1', cliente: 'cus_1' });
+  assert.deepEqual(pago.mudancas, { status: 'ativa', forma: 'PIX', asaas_assinatura_id: 'sub_1', fatura_url: null });
+  assert.equal(pago.estenderAte, '2026-12-13T23:59:59.000Z');
+  assert.equal(processarEvento({ event: 'PAYMENT_CREATED', payment: { customer: 'cus_1', billingType: 'PIX', invoiceUrl: 'https://sandbox.asaas.com/i/abc' } }).mudancas.fatura_url, 'https://sandbox.asaas.com/i/abc');
+  assert.equal(processarEvento({ event: 'PAYMENT_CREATED', payment: { customer: 'cus_1', billingType: 'PIX', invoiceUrl: 'https://golpe.com/pix' } }), null, 'link fora do Asaas é ignorado');
+  assert.equal(processarEvento({ event: 'PAYMENT_OVERDUE', payment: { customer: 'cus_1' } }).mudancas.status, 'atrasada');
+  assert.equal(processarEvento({ event: 'PAYMENT_REFUNDED', payment: { customer: 'cus_1' } }, agora).mudancas.acesso_ate, agora.toISOString());
+  assert.equal(processarEvento({ event: 'SUBSCRIPTION_DELETED', subscription: { id: 'sub_1', customer: 'cus_1' } }).mudancas.status, 'cancelada');
+  assert.deepEqual(processarEvento({ event: 'CHECKOUT_PAID', checkout: { id: 'chk-1' } }).chaves, { checkout: 'chk-1' });
+  assert.equal(processarEvento({ event: 'PAYMENT_UPDATED', payment: {} }), null);
+  assert.equal(processarEvento({}), null);
+});
+
+test('webhook: IDs estranhos não entram no filtro do banco; token em tempo constante', () => {
+  assert.equal(filtroDasChaves({ cliente: 'cus_1', assinatura: 'x,usuario_id.neq.0' }), 'or=(asaas_cliente_id.eq.cus_1)');
+  assert.equal(filtroDasChaves({ cliente: '..' }), null);
+  assert.equal(tokenConfere('abc', 'abc'), true);
+  assert.equal(tokenConfere('abd', 'abc'), false);
+  assert.equal(tokenConfere('', ''), false, 'sem token configurado nunca confere');
+});
+
+// ------------------------------------------------------------------ acesso às buscas
+
+test('acesso: só logado e com teste ou mensalidade em dia', async () => {
+  assert.equal(await exigirAcesso(new Request('https://x/api/vagas'), {}), null, 'sem Supabase (local): libera');
+  const rpc = (status, body) => fetchFalso([[/rpc\/tem_acesso$/, 'POST', { status, body }]]);
+  assert.equal((await exigirAcesso(new Request('https://x/api/vagas'), ENV, rpc(200, true))).status, 401, 'sem token');
+  const f = rpc(200, true);
+  assert.equal(await exigirAcesso(comToken('https://x/api/vagas'), ENV, f), null);
+  assert.equal(f.chamadas[0].headers['Content-Profile'], 'imobempregos');
+  assert.equal(f.chamadas[0].headers.Authorization, 'Bearer tok.en', 'a função roda com o token do usuário (RLS)');
+  const negado = await exigirAcesso(comToken('https://x/api/vagas'), ENV, rpc(200, false));
+  assert.equal(negado.status, 402);
+  assert.equal((await negado.json()).assinar, true);
+  assert.equal((await exigirAcesso(comToken('https://x/api/vagas'), ENV, rpc(401, {}))).status, 401);
+});
+
+// ------------------------------------------------------------------ assinar
+
+test('assinar com Pix: cria cliente e assinatura no Asaas e devolve o link da cobrança', async () => {
+  const f = fetchFalso([
+    usuario,
+    [/rest\/v1\/assinaturas\?usuario_id=eq\.[^&]+&select/, 'GET', { body: [linha()] }],
+    [/rest\/v1\/perfis\?/, 'GET', { body: [{ nome: 'Ana Souza', whatsapp: '5511912345678' }] }],
+    [/rest\/v1\/assinaturas\?usuario_id=eq\./, 'PATCH', { body: undefined }],
+    [/\/v3\/customers$/, 'POST', { body: { id: 'cus_abc' } }],
+    [/\/v3\/subscriptions$/, 'POST', { body: { id: 'sub_abc' } }],
+    [/\/v3\/subscriptions\/sub_abc\/payments/, 'GET', { body: { data: [{ id: 'pay_1', invoiceUrl: 'https://sandbox.asaas.com/i/pay1' }] } }],
+  ]);
+  const r = await assinar(comToken('https://x/api/assinar', { method: 'POST', body: JSON.stringify({ forma: 'PIX', cpf: CPF }) }), ENV, f);
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).url, 'https://sandbox.asaas.com/i/pay1');
+  const cliente = f.de(/\/v3\/customers$/)[0];
+  assert.equal(cliente.headers.access_token, '$aact_teste');
+  assert.deepEqual([cliente.corpo.cpfCnpj, cliente.corpo.mobilePhone, cliente.corpo.externalReference], ['52998224725', '11912345678', UID]);
+  const sub = f.de(/\/v3\/subscriptions$/)[0].corpo;
+  assert.deepEqual([sub.billingType, sub.value, sub.cycle, sub.nextDueDate], ['PIX', PRECO, 'MONTHLY', '2099-01-10'], 'no teste: vence quando o teste acaba');
+  assert.ok(f.chamadas.filter((c) => /supabase/.test(c.url)).every((c) => !JSON.stringify(c.corpo || '').includes('52998224725')), 'CPF nunca vai para o nosso banco');
+  assert.ok(f.de(/assinaturas/, 'PATCH').some((c) => c.corpo.fatura_url === 'https://sandbox.asaas.com/i/pay1'));
+});
+
+test('assinar com cartão: abre o Checkout recorrente do Asaas', async () => {
+  const f = fetchFalso([
+    usuario,
+    [/rest\/v1\/assinaturas\?usuario_id=eq\.[^&]+&select/, 'GET', { body: [linha({ asaas_cliente_id: 'cus_abc' })] }],
+    [/rest\/v1\/assinaturas\?usuario_id=eq\./, 'PATCH', { body: undefined }],
+    [/\/v3\/checkouts$/, 'POST', { body: { id: 'c7b1c696-b27b-4d3d-80b9-d1c018e387f8' } }],
+  ]);
+  const r = await assinar(comToken('https://x/api/assinar', { method: 'POST', body: JSON.stringify({ forma: 'CREDIT_CARD', cpf: CPF }) }), ENV, f);
+  assert.equal((await r.json()).url, 'https://sandbox.asaas.com/checkoutSession/show?id=c7b1c696-b27b-4d3d-80b9-d1c018e387f8');
+  const ck = f.de(/\/v3\/checkouts$/)[0].corpo;
+  assert.deepEqual(ck.billingTypes, ['CREDIT_CARD']);
+  assert.deepEqual(ck.chargeTypes, ['RECURRENT']);
+  assert.equal(ck.customer, 'cus_abc', 'reaproveita o cliente');
+  assert.equal(ck.items[0].value, PRECO);
+  assert.equal(ck.subscription.cycle, 'MONTHLY');
+  assert.equal(ck.callback.successUrl, 'https://imobempregos.pages.dev/assinatura.html?r=ok');
+  assert.equal(f.de(/\/v3\/customers/).length, 0);
+});
+
+test('assinar: recusa CPF inválido, forma inválida e quem já assinou', async () => {
+  const f = fetchFalso([usuario, [/rest\/v1\/assinaturas\?/, 'GET', { body: [linha({ status: 'ativa', asaas_assinatura_id: 'sub_1', forma: 'CREDIT_CARD' })] }]]);
+  const pedir = (corpo) => assinar(comToken('https://x/api/assinar', { method: 'POST', body: JSON.stringify(corpo) }), ENV, f);
+  assert.equal((await pedir({ forma: 'PIX', cpf: '123' })).status, 400);
+  assert.equal((await pedir({ forma: 'BOLETO', cpf: CPF })).status, 400);
+  assert.equal((await pedir({ forma: 'PIX', cpf: CPF })).status, 409);
+  assert.equal(f.de(/asaas\.com/).length, 0, 'nenhuma chamada ao Asaas');
+  assert.equal((await assinar(new Request('https://x/api/assinar', { method: 'POST', body: '{}' }), ENV, f)).status, 401, 'sem login');
+});
+
+// ------------------------------------------------------------------ cancelar
+
+test('cancelar: encerra no Asaas e marca cancelada', async () => {
+  const f = fetchFalso([
+    usuario,
+    [/rest\/v1\/assinaturas\?usuario_id=eq\.[^&]+&select/, 'GET', { body: [linha({ status: 'ativa', asaas_assinatura_id: 'sub_abc', acesso_ate: '2099-02-01T00:00:00Z' })] }],
+    [/rest\/v1\/assinaturas\?usuario_id=eq\./, 'PATCH', { body: undefined }],
+    [/\/v3\/subscriptions\/sub_abc$/, 'DELETE', { body: { deleted: true } }],
+  ]);
+  const r = await cancelar(comToken('https://x/api/cancelar', { method: 'POST' }), ENV, f);
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).acesso_ate, '2099-02-01T00:00:00Z');
+  assert.equal(f.de(/assinaturas/, 'PATCH')[0].corpo.status, 'cancelada');
+  assert.equal(f.de(/assinaturas/, 'PATCH')[0].corpo.acesso_ate, undefined, 'não mexe no período pago');
+});
+
+// ------------------------------------------------------------------ webhook
+
+const evento = (corpo, token = ENV.ASAAS_WEBHOOK_TOKEN) =>
+  new Request('https://x/api/asaas-webhook', { method: 'POST', headers: { 'asaas-access-token': token }, body: JSON.stringify(corpo) });
+
+test('webhook: recusa token errado', async () => {
+  const f = fetchFalso([]);
+  assert.equal((await webhookAsaas(evento({ id: 'evt_1' }, 'errado'), ENV, f)).status, 403);
+  assert.equal((await webhookAsaas(evento({ id: 'evt_1' }), { ...ENV, ASAAS_WEBHOOK_TOKEN: '' }, f)).status, 500, 'sem token configurado não processa');
+  assert.equal(f.chamadas.length, 0);
+});
+
+test('webhook: pagamento estende o acesso (nunca encurta) e grava o evento', async () => {
+  const rotas = (acessoAtual) => fetchFalso([
+    [/eventos_asaas\?id=eq\./, 'GET', { body: [] }],
+    [/assinaturas\?or=/, 'GET', { body: [{ usuario_id: UID, acesso_ate: acessoAtual }] }],
+    [/assinaturas\?usuario_id=eq\./, 'PATCH', { body: undefined }],
+    [/eventos_asaas\?on_conflict/, 'POST', { body: undefined }],
+  ]);
+  const pago = { id: 'evt_9', event: 'PAYMENT_RECEIVED', payment: { customer: 'cus_abc', subscription: 'sub_abc', billingType: 'PIX', dueDate: '2026-11-10' } };
+  let f = rotas(null);
+  let r = await webhookAsaas(evento(pago), ENV, f);
+  assert.deepEqual(await r.json(), { ok: true, aplicado: true });
+  const patch = f.de(/assinaturas\?usuario_id/, 'PATCH')[0].corpo;
+  assert.equal(patch.status, 'ativa');
+  assert.equal(patch.acesso_ate, '2026-12-13T23:59:59.000Z');
+  assert.equal(f.de(/eventos_asaas\?on_conflict/, 'POST')[0].corpo.id, 'evt_9');
+  assert.match(f.de(/assinaturas\?or=/)[0].url, /or=\(asaas_assinatura_id\.eq\.sub_abc,asaas_cliente_id\.eq\.cus_abc\)/);
+
+  f = rotas('2027-06-01T00:00:00Z');
+  await webhookAsaas(evento(pago), ENV, f);
+  assert.equal(f.de(/assinaturas\?usuario_id/, 'PATCH')[0].corpo.acesso_ate, undefined, 'pagamento antigo não encurta o acesso');
+});
+
+test('webhook: evento repetido é ignorado; cliente desconhecido responde 200', async () => {
+  let f = fetchFalso([[/eventos_asaas\?id=eq\./, 'GET', { body: [{ id: 'evt_9' }] }]]);
+  assert.deepEqual(await (await webhookAsaas(evento({ id: 'evt_9', event: 'PAYMENT_RECEIVED', payment: { customer: 'cus_abc' } }), ENV, f)).json(), { ok: true, repetido: true });
+  f = fetchFalso([
+    [/eventos_asaas\?id=eq\./, 'GET', { body: [] }],
+    [/assinaturas\?or=/, 'GET', { body: [] }],
+    [/eventos_asaas\?on_conflict/, 'POST', { body: undefined }],
+  ]);
+  const r = await webhookAsaas(evento({ id: 'evt_10', event: 'PAYMENT_RECEIVED', payment: { customer: 'cus_outro', dueDate: '2026-11-10' } }), ENV, f);
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).aplicado, false);
+});
+
+test('webhook: falha no banco devolve 500 para o Asaas reenviar', async () => {
+  const f = fetchFalso([[/eventos_asaas\?id=eq\./, 'GET', { status: 503, body: { message: 'fora do ar' } }]]);
+  const r = await webhookAsaas(evento({ id: 'evt_11', event: 'PAYMENT_RECEIVED', payment: {} }), ENV, f);
+  assert.equal(r.status, 500);
+});

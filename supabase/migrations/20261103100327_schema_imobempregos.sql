@@ -1,5 +1,8 @@
 -- Schema do aplicativo imobempregos.
 --
+-- Acesso: login com e-mail e senha (Supabase Auth). O cadastro pede nome,
+-- WhatsApp, e-mail e senha; nome e WhatsApp ficam em imobempregos.perfis.
+--
 -- Princípio de privacidade: o currículo NUNCA é gravado no banco. A análise e a
 -- nota de aderência são calculadas no navegador; aqui ficam só as escolhas do
 -- usuário (buscas salvas, vagas acompanhadas) e um cache das vagas públicas.
@@ -40,19 +43,26 @@ $$;
 
 create table imobempregos.perfis (
   id            uuid primary key references auth.users (id) on delete cascade,
-  nome          text check (char_length(nome) <= 120),
+  nome          text not null check (char_length(btrim(nome)) between 2 and 120),
+  -- Celular brasileiro no formato internacional, só dígitos: 55 + DDD + 9 + 8 dígitos.
+  whatsapp      text not null check (whatsapp ~ '^55[1-9]{2}9[0-9]{8}$'),
   cidade        text check (char_length(cidade) <= 120),
   uf            char(2) check (uf ~ '^[A-Z]{2}$'),
   criado_em     timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );
-comment on table imobempregos.perfis is 'Um perfil por usuário, criado no cadastro. Sem currículo.';
+comment on table imobempregos.perfis is 'Um perfil por usuário, criado no cadastro (nome e WhatsApp). Sem currículo.';
 
 create trigger perfis_atualizado_em before update on imobempregos.perfis
   for each row execute function imobempregos.tocar_atualizado_em();
 
--- Cria o perfil quando a pessoa se cadastra. Precisa de SECURITY DEFINER porque
--- roda como o papel do Auth, que não tem acesso a este schema. Só grava o id.
+-- Cria o perfil quando a pessoa se cadastra, com o nome e o WhatsApp enviados
+-- no signUp (options.data). Precisa de SECURITY DEFINER porque roda como o papel
+-- do Auth, que não tem acesso a este schema. Se nome ou WhatsApp faltarem ou
+-- forem inválidos, as restrições da tabela recusam e o cadastro inteiro falha:
+-- não existe conta sem perfil completo.
+-- (Os metadados do usuário são editáveis por ele: servem só para preencher o
+-- perfil, nunca para decidir permissões.)
 create function imobempregos.criar_perfil_no_cadastro()
 returns trigger
 language plpgsql
@@ -60,7 +70,13 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into imobempregos.perfis (id) values (new.id) on conflict (id) do nothing;
+  insert into imobempregos.perfis (id, nome, whatsapp)
+  values (
+    new.id,
+    btrim(new.raw_user_meta_data ->> 'nome'),
+    regexp_replace(coalesce(new.raw_user_meta_data ->> 'whatsapp', ''), '[^0-9]', '', 'g')
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$;

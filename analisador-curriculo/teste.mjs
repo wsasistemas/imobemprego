@@ -206,3 +206,32 @@ test('Vigia: relatório escapa o texto das vagas e separa as melhores', () => {
   assert.match(outras, /não está mais publicada/);
   assert.match(html, /data-copiar="\/apply https:\/\/e\.gupy\.io\/jobs\/1"/);
 });
+
+// ------------------------------------------------------------ cadastro e login
+const V = createRequire(import.meta.url)('./validacao.js');
+
+test('cadastro: WhatsApp aceita só celular brasileiro com DDD', () => {
+  assert.equal(V.normalizarWhatsapp('(11) 91234-5678'), '5511912345678');
+  assert.equal(V.normalizarWhatsapp('+55 21 98765-4321'), '5521987654321');
+  assert.equal(V.normalizarWhatsapp('11 3333-4444'), null, 'fixo');
+  assert.equal(V.normalizarWhatsapp('(01) 91234-5678'), null, 'DDD inválido');
+  assert.equal(V.normalizarWhatsapp('91234-5678'), null, 'sem DDD');
+  assert.equal(V.mascararWhatsapp('11912345678'), '(11) 91234-5678');
+  assert.equal(V.mascararWhatsapp('+5511912345678'), '(11) 91234-5678');
+  assert.equal(V.mascararWhatsapp('119'), '(11) 9');
+});
+
+test('cadastro: valida todos os campos e normaliza', () => {
+  const ok = V.validarCadastro({ nome: '  Ana   Souza ', whatsapp: '(11) 91234-5678', email: ' Ana@Email.com ', senha: 'segredo123', termos: true });
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.dados, { nome: 'Ana Souza', whatsapp: '5511912345678', email: 'ana@email.com', senha: 'segredo123' });
+  const ruim = V.validarCadastro({ nome: '1', whatsapp: '123', email: 'ana@', senha: 'curta', termos: false });
+  assert.deepEqual(Object.keys(ruim.erros).sort(), ['email', 'nome', 'senha', 'termos', 'whatsapp']);
+});
+
+test('login: mensagens de erro do Supabase em português', () => {
+  assert.equal(V.mensagemErroAuth({ code: 'invalid_credentials' }), 'E-mail ou senha incorretos.');
+  assert.match(V.mensagemErroAuth({ message: 'Email not confirmed' }), /Confirme seu e-mail/);
+  assert.match(V.mensagemErroAuth({ message: 'Database error saving new user' }), /nome e WhatsApp/);
+  assert.match(V.mensagemErroAuth({ message: 'qualquer coisa' }), /Algo deu errado/);
+});

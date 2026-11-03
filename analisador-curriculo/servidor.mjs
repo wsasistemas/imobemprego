@@ -17,6 +17,20 @@ const ARQUIVOS = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/analisador.js': ['analisador.js', 'text/javascript; charset=utf-8'],
+  '/entrar.html': ['entrar.html', 'text/html; charset=utf-8'],
+  '/termos.html': ['termos.html', 'text/html; charset=utf-8'],
+  '/assinatura.html': ['assinatura.html', 'text/html; charset=utf-8'],
+  '/privacidade.html': ['privacidade.html', 'text/html; charset=utf-8'],
+  '/config.js': ['config.js', 'text/javascript; charset=utf-8'],
+  '/auth.js': ['auth.js', 'text/javascript; charset=utf-8'],
+  '/validacao.js': ['validacao.js', 'text/javascript; charset=utf-8'],
+  '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
+  '/icone.svg': ['icone.svg', 'image/svg+xml'],
+  '/icone-180.png': ['icone-180.png', 'image/png'],
+  '/icone-192.png': ['icone-192.png', 'image/png'],
+  '/icone-512.png': ['icone-512.png', 'image/png'],
+  '/img/entrar.jpg': ['img/entrar.jpg', 'image/jpeg'],
+  '/img/cadastro.jpg': ['img/cadastro.jpg', 'image/jpeg'],
 };
 
 const CACHE_MS = 10 * 60 * 1000;

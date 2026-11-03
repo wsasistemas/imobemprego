@@ -1,0 +1,12 @@
+{
+  "name": "imobempregos-testes-banco",
+  "private": true,
+  "type": "module",
+  "description": "Testa a migração do schema imobempregos num Postgres embutido (PGlite), sem Docker.",
+  "scripts": {
+    "test": "node testar-migracao.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14"
+  }
+}

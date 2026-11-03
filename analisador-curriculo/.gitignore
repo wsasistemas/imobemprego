@@ -2,3 +2,8 @@
 vigia.json
 dados/
 relatorios/
+
+# Cloudflare: segredos locais do wrangler e o site montado (node build.mjs)
+.dev.vars
+.wrangler/
+dist/
